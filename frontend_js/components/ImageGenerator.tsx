@@ -13,7 +13,7 @@ export default function ImageGenerator() {
   
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
 
-  const { googleDriveFolderId } = useAppStore();
+  const { driveSettings } = useAppStore();
 
   const getModelName = () => {
     switch (plan) {
@@ -151,7 +151,7 @@ export default function ImageGenerator() {
             body: JSON.stringify({
                 imageBase64: finalBase64,
                 filename: `gen-${prompt.slice(0, 10).replace(/\s+/g, '-')}-${Date.now()}.png`,
-                folderId: googleDriveFolderId
+                folderId: driveSettings.imagesId
             })
         });
 

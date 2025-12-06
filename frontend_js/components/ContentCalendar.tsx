@@ -62,14 +62,14 @@ export default function ContentCalendar() {
       });
 
       // Save to Google Sheets
-      const { googleSheetsEnabled, googleDriveFolderId } = useAppStore.getState();
+      const { googleSheetsEnabled, driveSettings } = useAppStore.getState();
       
       if (googleSheetsEnabled) {
         try {
           const res = await fetch('/api/google/sheets/write', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ item, folderId: googleDriveFolderId }),
+            body: JSON.stringify({ item, folderId: driveSettings.plannerId }),
           });
           
           if (!res.ok) {

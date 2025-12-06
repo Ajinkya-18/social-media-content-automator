@@ -44,7 +44,7 @@ export default function Generator() {
   const [saveDirectory, setSaveDirectory] = useState('content');
   const [showPreview, setShowPreview] = useState(false);
   const [isSavingDocs, setIsSavingDocs] = useState(false);
-  const { googleDocsEnabled, googleDriveFolderId } = useAppStore();
+  const { googleDocsEnabled, driveSettings } = useAppStore();
 
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
 
@@ -202,7 +202,7 @@ export default function Generator() {
         body: JSON.stringify({
           title,
           content: generatedContent,
-          folderId: googleDriveFolderId
+          folderId: driveSettings.scriptsId
         })
       });
 
