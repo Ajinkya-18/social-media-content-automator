@@ -11,12 +11,11 @@ const nextConfig: NextConfig = {
   // Rewrites removed in favor of explicit Proxy Route (app/api/python/[...path]/route.ts)
   // async rewrites() { ... }
   
-  experimental: {
-    // @ts-ignore - Turbopack root is valid but missing from types
-    turbopack: {
-      root: path.resolve(__dirname, ".."),
-    },
-  },
+  // experimental: {
+  //   turbopack: {
+  //     root: path.resolve(__dirname, ".."),
+  //   },
+  // },
 };
 
 export default nextConfig;
