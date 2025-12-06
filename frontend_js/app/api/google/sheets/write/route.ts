@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { getAuthClient } from '../../../../../lib/google';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../../../../lib/auth"; 
 
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    // @ts-ignore
+    if (!session || !session.accessToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { item } = await request.json();
-    const auth = await getAuthClient();
+    // @ts-ignore
+    const auth = await getAuthClient(session.accessToken);
+    
     const sheets = google.sheets({ version: 'v4', auth });
     const drive = google.drive({ version: 'v3', auth });
 
@@ -47,10 +58,6 @@ export async function POST(request: Request) {
     }
 
     // 2. Append the new item
-    // We want to check if the ID already exists to update it, but for simplicity in this MVP, 
-    // we will just append new rows. A real sync is complex.
-    // Let's just append.
-    
     const values = [
       [item.id, item.date, item.platform, item.topic, item.prompt, item.status]
     ];

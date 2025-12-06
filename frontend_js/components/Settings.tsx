@@ -2,38 +2,25 @@
 
 import React, { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, Check, AlertCircle, Loader } from 'lucide-react';
-
+import { useSession, signIn } from 'next-auth/react';
 import { useAppStore } from '../lib/store';
 
 export default function Settings() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authUrl, setAuthUrl] = useState('');
-  const [loading, setLoading] = useState(true);
+  const { data: session, status } = useSession();
+  const loading = status === 'loading';
+  const isAuthenticated = status === 'authenticated';
+  
   const { 
-    googleDriveEnabled, googleSheetsEnabled, googleDocsEnabled, toggleGoogleService 
+    googleDriveEnabled, googleSheetsEnabled, googleDocsEnabled, toggleGoogleService, setGoogleService
   } = useAppStore();
 
   useEffect(() => {
-    fetch('/api/auth/google')
-      .then(res => res.json())
-      .then(data => {
-        setIsAuthenticated(data.authenticated);
-        if (data.authUrl) {
-          setAuthUrl(data.authUrl);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, []);
-
-  const handleConnect = () => {
-    if (authUrl) {
-      window.location.href = authUrl;
+    if (isAuthenticated) {
+      setGoogleService('drive', true);
+      setGoogleService('sheets', true);
+      setGoogleService('docs', true);
     }
-  };
+  }, [isAuthenticated, setGoogleService]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -70,7 +57,7 @@ export default function Settings() {
               </div>
             ) : (
               <button
-                onClick={handleConnect}
+                onClick={() => signIn('google')}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Connect Account
@@ -118,7 +105,7 @@ export default function Settings() {
           <AlertCircle size={20} className="mr-3 flex-shrink-0 mt-0.5" />
           <p>
             To use the Google integration, you need to connect your account. 
-            Ensure your <code>credentials.json</code> is correctly placed in the project root.
+            This will allow us to save your content plans to Sheets and Drive.
           </p>
         </div>
       )}

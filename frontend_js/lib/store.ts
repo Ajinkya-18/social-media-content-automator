@@ -16,6 +16,7 @@ interface AppState {
   googleSheetsEnabled: boolean;
   googleDocsEnabled: boolean;
   toggleGoogleService: (service: 'drive' | 'sheets' | 'docs') => void;
+  setGoogleService: (service: 'drive' | 'sheets' | 'docs', enabled: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -37,6 +38,12 @@ export const useAppStore = create<AppState>((set) => ({
     if (service === 'drive') return { googleDriveEnabled: !state.googleDriveEnabled };
     if (service === 'sheets') return { googleSheetsEnabled: !state.googleSheetsEnabled };
     if (service === 'docs') return { googleDocsEnabled: !state.googleDocsEnabled };
+    return state;
+  }),
+  setGoogleService: (service, enabled) => set((state) => {
+    if (service === 'drive') return { googleDriveEnabled: enabled };
+    if (service === 'sheets') return { googleSheetsEnabled: enabled };
+    if (service === 'docs') return { googleDocsEnabled: enabled };
     return state;
   }),
 }));

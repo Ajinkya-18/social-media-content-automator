@@ -13,6 +13,8 @@ export const metadata: Metadata = {
 
 import ErrorBoundary from "../components/ErrorBoundary";
 
+import { Providers } from "./providers";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,7 +24,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${outfit.variable} font-sans antialiased`} suppressHydrationWarning>
         <ErrorBoundary>
-          <Layout>{children}</Layout>
+          <Providers>
+            <Layout>{children}</Layout>
+          </Providers>
         </ErrorBoundary>
       </body>
     </html>

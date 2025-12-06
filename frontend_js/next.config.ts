@@ -8,23 +8,8 @@ const API_URL = process.env.NODE_ENV === "development"
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  async rewrites() {
-    return [
-      {
-        source: "/api/python/:path*",
-        destination: `${API_URL}/:path*`,
-      },
-      // Fallback for direct API calls if needed (redundant but safe)
-      {
-        source: "/api/python/generate/image",
-        destination: `${API_URL}/generate/image`,
-      },
-      {
-        source: "/api/python/generate/text",
-        destination: `${API_URL}/generate/text`,
-      }
-    ];
-  },
+  // Rewrites removed in favor of explicit Proxy Route (app/api/python/[...path]/route.ts)
+  // async rewrites() { ... }
   
   experimental: {
     // @ts-ignore - Turbopack root is valid but missing from types
