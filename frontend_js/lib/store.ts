@@ -25,6 +25,10 @@ interface AppState {
     youtube: string;
   };
   setSocialProfile: (platform: 'twitter' | 'linkedin' | 'instagram' | 'youtube', url: string) => void;
+  // Drive Settings
+  googleDriveFolderId: string | null;
+  googleDriveFolderName: string | null;
+  setGoogleDriveFolder: (id: string | null, name: string | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -63,4 +67,7 @@ export const useAppStore = create<AppState>((set) => ({
   setSocialProfile: (platform, url) => set((state) => ({
     socialProfiles: { ...state.socialProfiles, [platform]: url }
   })),
+  googleDriveFolderId: null,
+  googleDriveFolderName: null,
+  setGoogleDriveFolder: (id, name) => set({ googleDriveFolderId: id, googleDriveFolderName: name }),
 }));

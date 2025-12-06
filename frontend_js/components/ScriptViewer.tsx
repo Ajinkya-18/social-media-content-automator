@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../lib/store';
-import { ArrowLeft, Save, Loader } from 'lucide-react';
+import { ArrowLeft, Save, Loader, Cloud } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { EditorToolbar } from './EditorToolbar';
@@ -10,7 +10,7 @@ interface ScriptViewerProps {
 }
 
 export default function ScriptViewer({ onBack }: ScriptViewerProps) {
-  const { selectedFile, setCurrentView, fileSource, selectedFileId } = useAppStore();
+  const { selectedFile, setCurrentView, fileSource, selectedFileId, googleDriveFolderId } = useAppStore();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -68,6 +68,29 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
     }
   };
 
+  const handleSaveToDrive = async () => {
+    try {
+      const res = await fetch('/api/google/drive/create-doc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            title: `Script - ${selectedFile || new Date().toISOString().split('T')[0]}`, 
+            content: editor?.getText() || content, // Send plain text for now as the API handles it
+            folderId: googleDriveFolderId
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Script saved to Google Drive! View at: ${data.link}`);
+      } else {
+        throw new Error('Failed to save to Drive');
+      }
+    } catch (e) {
+      console.error('Drive save error', e);
+      alert('Failed to save to Drive');
+    }
+  };
+
   if (!selectedFile) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -94,34 +117,44 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
           </button>
           <h1 className="text-2xl font-bold text-white">{selectedFile}</h1>
         </div>
-        <button 
-          onClick={async () => {
-            if (!selectedFile) return;
-            try {
-              const res = await fetch('/api/storage/write', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  filename: selectedFile,
-                  content: content,
-                  directory: 'content' // Defaulting to content for now
-                }),
-              });
-              if (res.ok) {
-                alert('Saved successfully!');
-              } else {
-                throw new Error('Save failed');
-              }
-            } catch (e) {
-              console.error(e);
-              alert('Failed to save.');
-            }
-          }}
-          className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-        >
-          <Save size={18} className="mr-2" />
-          Save Changes
-        </button>
+        <div className="flex space-x-2">
+            <button
+                onClick={handleSaveToDrive}
+                className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
+                title="Save to Google Drive"
+            >
+                <Cloud size={18} className="mr-2" />
+                Save to Drive
+            </button>
+            <button 
+            onClick={async () => {
+                if (!selectedFile) return;
+                try {
+                const res = await fetch('/api/storage/write', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                    filename: selectedFile,
+                    content: content,
+                    directory: 'content'
+                    }),
+                });
+                if (res.ok) {
+                    alert('Saved successfully!');
+                } else {
+                    throw new Error('Save failed');
+                }
+                } catch (e) {
+                console.error(e);
+                alert('Failed to save.');
+                }
+            }}
+            className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+            >
+            <Save size={18} className="mr-2" />
+            Save Changes
+            </button>
+        </div>
       </div>
 
       <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm relative flex flex-col">

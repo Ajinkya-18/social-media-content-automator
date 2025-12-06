@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, Image as ImageIcon, Download, RefreshCw, Zap, Crown, Star } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, Download, RefreshCw, Zap, Crown, Star, Loader, Cloud } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAppStore } from '../lib/store';
 
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState('');
@@ -11,6 +12,8 @@ export default function ImageGenerator() {
   const [error, setError] = useState('');
   
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
+
+  const { googleDriveFolderId } = useAppStore();
 
   const getModelName = () => {
     switch (plan) {
@@ -138,6 +141,32 @@ export default function ImageGenerator() {
     }
   };
 
+  const handleSaveToDrive = async () => {
+    if (!generatedImage) return;
+    try {
+        let finalBase64 = generatedImage;
+        const res = await fetch('/api/google/drive/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                imageBase64: finalBase64,
+                filename: `gen-${prompt.slice(0, 10).replace(/\s+/g, '-')}-${Date.now()}.png`,
+                folderId: googleDriveFolderId
+            })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            alert(`Image saved to Drive! View at: ${data.link}`);
+        } else {
+            throw new Error('Upload failed');
+        }
+    } catch (e) {
+        console.error('Drive upload error', e);
+        alert('Failed to save to Drive');
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col">
       <div className="mb-8">
@@ -223,7 +252,15 @@ export default function ImageGenerator() {
                 alt="Generated" 
                 className="w-full h-full object-cover rounded-xl shadow-2xl"
               />
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl space-x-4">
+                <button 
+                  onClick={handleSaveToDrive}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold flex items-center hover:scale-105 transition-transform"
+                  title="Save to Google Drive"
+                >
+                  <Cloud size={20} className="mr-2" />
+                  Save to Drive
+                </button>
                 <button 
                   onClick={handleDownload}
                   className="px-6 py-3 bg-white text-black rounded-lg font-bold flex items-center hover:scale-105 transition-transform"

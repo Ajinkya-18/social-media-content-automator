@@ -12,8 +12,33 @@ export default function Settings() {
   
   const { 
     googleDriveEnabled, googleSheetsEnabled, googleDocsEnabled, toggleGoogleService, setGoogleService,
-    socialProfiles, setSocialProfile
+    socialProfiles, setSocialProfile,
+    googleDriveFolderId, googleDriveFolderName, setGoogleDriveFolder
   } = useAppStore();
+
+  const [folders, setFolders] = useState<any[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && googleDriveEnabled) {
+      fetchFolders();
+    }
+  }, [isAuthenticated, googleDriveEnabled]);
+
+  const fetchFolders = async () => {
+    setLoadingFolders(true);
+    try {
+      const res = await fetch('/api/google/drive/folders');
+      if (res.ok) {
+        const data = await res.json();
+        setFolders(data.folders || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch folders', error);
+    } finally {
+      setLoadingFolders(false);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -98,6 +123,30 @@ export default function Settings() {
               </div>
             </div>
           )}
+            {isAuthenticated && googleDriveEnabled && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">Default Content Folder (Drive)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setGoogleDriveFolder(null, null)}
+                      className={`p-3 rounded-lg text-sm text-center transition-colors ${!googleDriveFolderId ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                    >
+                      Root Directory
+                    </button>
+                    {folders.map(folder => (
+                      <button
+                        key={folder.id}
+                        onClick={() => setGoogleDriveFolder(folder.id, folder.name)}
+                        className={`p-3 rounded-lg text-sm text-center truncate transition-colors ${googleDriveFolderId === folder.id ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                      >
+                        {folder.name}
+                      </button>
+                    ))}
+                  </div>
+                  {loadingFolders && <p className="text-xs text-gray-500 mt-2">Loading folders...</p>}
+                </div>
+              )}
+
         </div>
       </div>
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Save, Calendar, Hash, Type, Layout, Check, Loader } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAppStore } from '../lib/store';
 
 interface PlanItem {
   id: string;
@@ -62,19 +63,14 @@ export default function ContentCalendar() {
 
       // Save to Google Sheets (Fire and forget or wait?)
       // We'll wait to show success.
-      // We assume if the user has enabled Google integration globally, we try to save there.
-      // Ideally check a store flag, but for now let's try calling it.
-      // We can check if the user is authenticated by checking if the API succeeds.
-      
       try {
         await fetch('/api/google/sheets/write', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item }),
+          body: JSON.stringify({ item, folderId: useAppStore.getState().googleDriveFolderId }),
         });
       } catch (sheetError) {
         console.warn('Failed to save to Google Sheets', sheetError);
-        // Don't fail the whole save if sheets fails (e.g. not auth'd)
       }
 
     } catch (error) {

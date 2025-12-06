@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { item } = await request.json();
+    const { item, folderId } = await request.json();
     // @ts-ignore
     const auth = await getAuthClient(session.accessToken);
     
@@ -22,8 +22,13 @@ export async function POST(request: Request) {
 
     // 1. Find or Create "Nocturnal Content Planner" spreadsheet
     let spreadsheetId;
+    let query = "name = 'Nocturnal Content Planner' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false";
+    if (folderId) {
+        query += ` and '${folderId}' in parents`;
+    }
+
     const fileList = await drive.files.list({
-      q: "name = 'Nocturnal Content Planner' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
+      q: query,
       fields: 'files(id, name)',
     });
 
@@ -40,6 +45,23 @@ export async function POST(request: Request) {
       
       if (!spreadsheetId) {
         throw new Error('Failed to retrieve spreadsheet ID');
+      }
+      
+      // Move to folder if specified
+      if (folderId) {
+          // Retrieve the existing parents to remove
+          const file = await drive.files.get({
+            fileId: spreadsheetId,
+            fields: 'parents'
+          });
+          const previousParents = file.data.parents?.join(',') || '';
+          
+          await drive.files.update({
+              fileId: spreadsheetId,
+              addParents: folderId,
+              removeParents: previousParents,
+              fields: 'id, parents'
+          });
       }
 
       // Add headers
