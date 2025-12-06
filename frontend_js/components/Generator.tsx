@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, Copy, RefreshCw, Save, Check, Instagram, Linkedin, Youtube, FileText, Hash, Eye, LayoutTemplate, Download, Share, Zap, Crown, Star } from 'lucide-react';
+import { Sparkles, Copy, RefreshCw, Save, Check, Instagram, Linkedin, Youtube, FileText, Hash, Eye, LayoutTemplate, Download, Share, Zap, Crown, Star, Loader } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { InstagramPreview } from './previews/InstagramPreview';
+import { useAppStore } from '../lib/store';
 import { LinkedInPreview } from './previews/LinkedInPreview';
 import { YouTubeCommunityPreview } from './previews/YouTubeCommunityPreview';
 
@@ -42,6 +43,8 @@ export default function Generator() {
   const [saveFilename, setSaveFilename] = useState('');
   const [saveDirectory, setSaveDirectory] = useState('content');
   const [showPreview, setShowPreview] = useState(false);
+  const [isSavingDocs, setIsSavingDocs] = useState(false);
+  const { googleDocsEnabled, googleDriveFolderId } = useAppStore();
 
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
 
@@ -185,6 +188,35 @@ export default function Generator() {
       console.error('Save failed', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveToDocs = async () => {
+    if (!generatedContent) return;
+    setIsSavingDocs(true);
+    try {
+      const title = topic.split('\n')[0].slice(0, 50) || 'Untitled Content';
+      const res = await fetch('/api/google/drive/create-doc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          content: generatedContent,
+          folderId: googleDriveFolderId
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Saved to Google Docs! View at: ${data.link}`); // Replace with better UI notification if possible, but alert is fine for now based on other components
+      } else {
+        throw new Error('Failed to save to Docs');
+      }
+    } catch (e) {
+      console.error('Docs save error', e);
+      alert('Failed to save to Google Docs');
+    } finally {
+      setIsSavingDocs(false);
     }
   };
 
@@ -530,6 +562,17 @@ export default function Generator() {
                 >
                   <Download size={16} />
                 </button>
+
+                {googleDocsEnabled && (
+                  <button 
+                    onClick={handleSaveToDocs}
+                    disabled={isSavingDocs}
+                    className="glass-button p-2 rounded-lg text-gray-400 hover:text-blue-400 transition-colors"
+                    title="Save to Google Docs"
+                  >
+                     {isSavingDocs ? <Loader size={16} className="animate-spin" /> : <FileText size={16} />}
+                  </button>
+                )}
                 
                 <button 
                   onClick={openSaveOptions}

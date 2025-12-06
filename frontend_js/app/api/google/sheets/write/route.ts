@@ -78,6 +78,49 @@ export async function POST(request: Request) {
     if (!spreadsheetId) {
         throw new Error('Failed to retrieve spreadsheet ID');
     }
+    // 1.5 Ensure "Planner" sheet exists
+    const spreadsheet = await sheets.spreadsheets.get({
+        spreadsheetId,
+        fields: 'sheets.properties'
+    });
+    
+    const sheetExists = spreadsheet.data.sheets?.some(
+        s => s.properties?.title === 'Planner'
+    );
+    
+    if (!sheetExists) {
+        await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [
+                    {
+                        addSheet: {
+                            properties: { title: 'Planner' }
+                        }
+                    },
+                    // Add headers to the new sheet
+                    {
+                        appendCells: {
+                            sheetId: undefined, // Need specific ID? No, appendCells needs sheetId. 
+                            // Easier to use values.append after creation.
+                            // But wait, addSheet returns the properties including ID.
+                            // Let's just create the sheet, then use values.append for headers.
+                        }
+                    }
+                ]
+            }
+        });
+        
+        // Add headers separately to be safe/simple
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: 'Planner!A1',
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [['ID', 'Date', 'Platform', 'Topic', 'Prompt', 'Status']]
+            }
+        });
+    }
 
     // 2. Append the new item
     const values = [
@@ -94,6 +137,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, spreadsheetId });
   } catch (error) {
     console.error('Sheets Write Error:', error);
+    const fs = require('fs');
+    try {
+        const msg = error instanceof Error ? error.message : String(error);
+        fs.appendFileSync('error.log', `${new Date().toISOString()} - Sheets Write Error: ${msg}\n`);
+    } catch (e) {
+        console.error('Failed to write to error log', e);
+    }
     return NextResponse.json({ error: 'Failed to write to Google Sheets' }, { status: 500 });
   }
 }

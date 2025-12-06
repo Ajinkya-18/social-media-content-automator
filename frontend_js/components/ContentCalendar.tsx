@@ -61,16 +61,28 @@ export default function ContentCalendar() {
         body: JSON.stringify(item),
       });
 
-      // Save to Google Sheets (Fire and forget or wait?)
-      // We'll wait to show success.
-      try {
-        await fetch('/api/google/sheets/write', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item, folderId: useAppStore.getState().googleDriveFolderId }),
-        });
-      } catch (sheetError) {
-        console.warn('Failed to save to Google Sheets', sheetError);
+      // Save to Google Sheets
+      const { googleSheetsEnabled, googleDriveFolderId } = useAppStore.getState();
+      
+      if (googleSheetsEnabled) {
+        try {
+          const res = await fetch('/api/google/sheets/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item, folderId: googleDriveFolderId }),
+          });
+          
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Unknown error');
+          }
+          
+          // Optional: Notify success for sheet
+          // console.log('Saved to sheets');
+        } catch (sheetError: any) {
+          console.error('Failed to save to Google Sheets', sheetError);
+          alert(`Saved locally, but failed to save to Google Sheets: ${sheetError.message}`);
+        }
       }
 
     } catch (error) {
