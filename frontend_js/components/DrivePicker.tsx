@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Folder, ChevronRight, Check, X, Loader, ArrowLeft } from 'lucide-react';
+import { Folder, ChevronRight, Check, X, Loader, ArrowLeft, Home } from 'lucide-react';
 
 interface DriveFile {
   id: string;
@@ -25,32 +25,24 @@ export default function DrivePicker({ isOpen, onClose, onSelect, title = 'Select
 
   useEffect(() => {
     if (isOpen) {
-      fetchFolders(currentFolderId);
+      // Reset to root when opening
+      setCurrentFolderId(null);
+      setCurrentFolderName('Root');
+      setFolderHistory([]);
+      fetchFolders(null);
     }
-  }, [isOpen, currentFolderId]);
+  }, [isOpen]);
 
   const fetchFolders = async (parentId: string | null) => {
     setLoading(true);
     try {
-      // We might need to update the API to support parentId filtering if not already supported
-      // Assuming /api/google/drive/folders returns a flat list of ALL folders for now based on previous inspection
-      // If it returns all folders, we can filter client side, or if it supports ?parentId=... 
-      // Let's check the API implementation again. 
-      // The previous inspection of `app/api/google/drive/folders/route.ts` showed it just lists folders:
-      // q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-      // It doesn't seem to filter by parent. So it fetches top 20 folders globally.
-      // This is a limitation. For a proper picker we need to navigate.
-      // For now, let's just fetch all (paginated) or try to implement parent filtering if possible.
-      // Modifying the query to include parents causes complexity if we don't pass it.
-      
-      // Let's start with the existing endpoint. If it returns top-level or recent folders, user can pick one.
-      // Ideally we would update the API to verify `q` parameter support.
-      
-      // Construct query param if we want to modify endpoint later, but for now standard fetch
-      const res = await fetch('/api/google/drive/folders'); 
+      const url = parentId 
+        ? `/api/google/drive/folders?parentId=${parentId}`
+        : '/api/google/drive/folders';
+        
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        // Simple client-side check if we want to simulate hierarchy or just show all available
         setFolders(data.folders || []);
       }
     } catch (error) {
@@ -59,15 +51,28 @@ export default function DrivePicker({ isOpen, onClose, onSelect, title = 'Select
       setLoading(false);
     }
   };
-  
-  // NOTE: Simple version - just list folders. 
-  // If we want hierarchy, we need to update the backend API to accept `parentId`.
-  // Given user wants "Drive Browser", a flat list of 20 random folders is bad.
-  // BUT, to keep it simple as a first step of "refactoring", let's use what we have and maybe
-  // mark a task to improve the API for navigation. 
-  // Actually, the user asked for a "Drive Browser Window". 
-  // I should probably make the API better right now or next step.
-  // For this step, I'll build the UI.
+
+  const handleFolderClick = (folderId: string, folderName: string) => {
+    // Push current to history before moving
+    setFolderHistory(prev => [...prev, { id: currentFolderId, name: currentFolderName }]);
+    setCurrentFolderId(folderId);
+    setCurrentFolderName(folderName);
+    fetchFolders(folderId);
+  };
+
+  const handleBack = () => {
+    if (folderHistory.length === 0) return;
+    
+    const newHistory = [...folderHistory];
+    const previous = newHistory.pop();
+    
+    if (previous) {
+        setFolderHistory(newHistory);
+        setCurrentFolderId(previous.id);
+        setCurrentFolderName(previous.name);
+        fetchFolders(previous.id);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -83,8 +88,17 @@ export default function DrivePicker({ isOpen, onClose, onSelect, title = 'Select
             </button>
         </div>
         
-        <div className="p-2 border-b border-white/5 bg-black/20 flex items-center text-sm text-gray-400">
-            <span className="truncate">Current: <span className="text-white font-medium">{currentFolderName}</span></span>
+        <div className="p-2 border-b border-white/5 bg-black/20 flex items-center text-sm text-gray-400 space-x-2">
+            {currentFolderId && (
+                <button onClick={handleBack} className="p-1 hover:bg-white/10 rounded-full transition-colors text-white">
+                    <ArrowLeft size={16} />
+                </button>
+            )}
+            <div className="flex items-center text-gray-400">
+                <Home size={14} className="mr-1" />
+                <span className="mx-1">/</span>
+                <span className="text-white font-medium truncate max-w-[200px]">{currentFolderName}</span>
+            </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-[300px]">
@@ -100,23 +114,25 @@ export default function DrivePicker({ isOpen, onClose, onSelect, title = 'Select
             ) : (
                 <div className="space-y-1">
                     {/* Root Option */}
+                    {/* Current Selection Option */}
                     <button
-                        onClick={() => onSelect('', 'Root Directory')}
-                        className="w-full flex items-center p-3 hover:bg-white/5 rounded-lg transition-colors group text-left"
+                        onClick={() => onSelect(currentFolderId || '', currentFolderName)}
+                        className="w-full flex items-center p-3 hover:bg-white/5 rounded-lg transition-colors group text-left border border-blue-500/30 bg-blue-500/5 mb-2"
                     >
-                        <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg mr-3 group-hover:bg-blue-500/20">
-                            <Folder size={20} />
+                        <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg mr-3">
+                            <Check size={20} />
                         </div>
                         <div className="flex-1 truncate">
-                            <p className="text-sm font-medium text-gray-200 group-hover:text-white">Root Directory</p>
+                            <p className="text-sm font-medium text-blue-200">Select Current Folder</p>
+                            <p className="text-xs text-blue-400/60">Upload to "{currentFolderName}"</p>
                         </div>
-                        <Check size={16} className="text-gray-500 opacity-0 group-hover:opacity-50" />
                     </button>
 
                     {folders.map((folder) => (
                         <button
                             key={folder.id}
-                            onClick={() => onSelect(folder.id, folder.name)}
+                            key={folder.id}
+                            onClick={() => handleFolderClick(folder.id, folder.name)}
                             className="w-full flex items-center p-3 hover:bg-white/5 rounded-lg transition-colors group text-left"
                         >
                             <div className="p-2 bg-gray-800 text-gray-400 rounded-lg mr-3 group-hover:bg-gray-700 group-hover:text-gray-200">
@@ -125,7 +141,15 @@ export default function DrivePicker({ isOpen, onClose, onSelect, title = 'Select
                             <div className="flex-1 truncate">
                                 <p className="text-sm font-medium text-gray-300 group-hover:text-white">{folder.name}</p>
                             </div>
-                            {/* Navigation capability would go here if we implemented it */}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleFolderClick(folder.id, folder.name);
+                                }}
+                                className="p-2 hover:bg-white/10 rounded-full text-gray-500 hover:text-white"
+                            >
+                                <ChevronRight size={20} />
+                            </button>
                         </button>
                     ))}
                 </div>
