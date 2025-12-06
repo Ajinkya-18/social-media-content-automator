@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { LayoutDashboard, Calendar, FileText, Zap, Settings, Menu, X, Image as ImageIcon } from 'lucide-react';
 import { useAppStore } from '../lib/store';
 import { AuroraBackground } from './AuroraBackground';
+import { useSession, signOut } from 'next-auth/react';
+import { LogOut } from 'lucide-react';
 
 const SidebarItem = ({ icon: Icon, label, view, active, onClick }: any) => (
   <motion.button
@@ -26,6 +28,7 @@ import { useIsMounted } from '../hooks/useIsMounted';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { currentView, setCurrentView, isSidebarOpen, toggleSidebar } = useAppStore();
+  const { data: session } = useSession();
   const isMounted = useIsMounted();
 
   const menuItems = [
@@ -73,8 +76,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <div className="p-4 border-t border-white/5">
-            {/* User profile removed from here */}
+          <div className="p-4 border-t border-white/5 mt-auto">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+               <div className="flex items-center min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-purple-500/20 flex-shrink-0">
+                    {session?.user?.image ? (
+                      <img src={session.user.image} alt="User" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <span>{session?.user?.name?.[0] || 'N'}</span>
+                    )}
+                  </div>
+                  <div className="ml-3 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{session?.user?.name || 'Nocturnal User'}</p>
+                    <p className="text-xs text-purple-400">Pro Plan</p>
+                  </div>
+               </div>
+               <button 
+                 onClick={() => signOut()}
+                 className="ml-2 text-gray-400 hover:text-red-400 transition-colors p-1.5 hover:bg-white/5 rounded-lg"
+                 title="Sign Out"
+               >
+                 <LogOut size={16} />
+               </button>
+            </div>
           </div>
         </motion.aside>
 
@@ -91,16 +115,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <h2 className="text-lg font-medium text-gray-200 capitalize">{currentView}</h2>
             </div>
             <div className="flex items-center space-x-4">
-              {/* User Profile moved here */}
-              <div className="flex items-center p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5">
-                <div className="text-right mr-3 hidden sm:block">
-                  <p className="text-sm font-medium text-white">Nocturnal User</p>
-                  <p className="text-xs text-gray-500">Pro Plan</p>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-purple-500/20">
-                  N
-                </div>
-              </div>
+              {/* Profile removed */}
             </div>
           </header>
 
