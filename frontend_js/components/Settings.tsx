@@ -11,7 +11,8 @@ export default function Settings() {
   const isAuthenticated = status === 'authenticated';
   
   const { 
-    googleDriveEnabled, googleSheetsEnabled, googleDocsEnabled, toggleGoogleService, setGoogleService
+    googleDriveEnabled, googleSheetsEnabled, googleDocsEnabled, toggleGoogleService, setGoogleService,
+    socialProfiles, setSocialProfile
   } = useAppStore();
 
   useEffect(() => {
@@ -97,6 +98,28 @@ export default function Settings() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+          <SettingsIcon size={24} className="mr-3 text-purple-400" />
+          Social Profiles
+        </h2>
+        <div className="space-y-4">
+           {['twitter', 'linkedin', 'instagram', 'youtube'].map((platform) => (
+             <div key={platform} className="space-y-1">
+               <label className="text-sm text-gray-400 capitalize">{platform} URL</label>
+               <input 
+                  type="text" 
+                  // @ts-ignore
+                  value={socialProfiles[platform]}
+                  // @ts-ignore
+                  onChange={(e) => setSocialProfile(platform, e.target.value)}
+                  placeholder={`https://${platform}.com/username`}
+                  className="w-full bg-black/20 border border-white/10 rounded-lg p-3 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+               />
+             </div>
+           ))}
         </div>
       </div>
       

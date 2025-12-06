@@ -17,6 +17,14 @@ interface AppState {
   googleDocsEnabled: boolean;
   toggleGoogleService: (service: 'drive' | 'sheets' | 'docs') => void;
   setGoogleService: (service: 'drive' | 'sheets' | 'docs', enabled: boolean) => void;
+  // Social Profiles
+  socialProfiles: {
+    twitter: string;
+    linkedin: string;
+    instagram: string;
+    youtube: string;
+  };
+  setSocialProfile: (platform: 'twitter' | 'linkedin' | 'instagram' | 'youtube', url: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -46,4 +54,13 @@ export const useAppStore = create<AppState>((set) => ({
     if (service === 'docs') return { googleDocsEnabled: enabled };
     return state;
   }),
+  socialProfiles: {
+    twitter: '',
+    linkedin: '',
+    instagram: '',
+    youtube: '',
+  },
+  setSocialProfile: (platform, url) => set((state) => ({
+    socialProfiles: { ...state.socialProfiles, [platform]: url }
+  })),
 }));

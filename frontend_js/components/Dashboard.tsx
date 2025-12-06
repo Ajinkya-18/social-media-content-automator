@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Clock, File, CheckCircle } from 'lucide-react';
+import { TrendingUp, Clock, File, CheckCircle, Users, Activity } from 'lucide-react';
+import { useAppStore } from '../lib/store';
 
 const StatCard = ({ icon: Icon, label, value, color }: any) => (
   <motion.div
@@ -20,8 +21,11 @@ const StatCard = ({ icon: Icon, label, value, color }: any) => (
 export default function Dashboard() {
   const [recentFiles, setRecentFiles] = useState<any[]>([]);
   const [upcomingPlans, setUpcomingPlans] = useState<any[]>([]);
+  const { socialProfiles } = useAppStore();
   const [stats, setStats] = useState({
-    totalViews: '1.2M', // Mock for now
+    totalViews: '0', 
+    totalFollowers: '0',
+    engagementRate: '0%',
     scheduled: 0,
     drafts: 0,
     completed: 0
@@ -29,11 +33,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [socialProfiles]); // Refetch when profiles change
 
   const fetchData = async () => {
     try {
-      // Fetch Files
+      // 1. Fetch Social Stats
+      const socialRes = await fetch('/api/local/social-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profiles: socialProfiles })
+      });
+      if (socialRes.ok) {
+        const socialData = await socialRes.json();
+        setStats(prev => ({ 
+            ...prev, 
+            totalViews: socialData.totalViews,
+            totalFollowers: socialData.totalFollowers,
+            engagementRate: socialData.engagementRate
+        }));
+      }
+
       // Fetch Files
       const filesRes = await fetch('/api/local/files');
       const filesContentType = filesRes.headers.get("content-type");
@@ -81,9 +100,9 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard icon={TrendingUp} label="Total Views" value={stats.totalViews} color="bg-blue-500/20" />
-        <StatCard icon={Clock} label="Scheduled" value={stats.scheduled} color="bg-purple-500/20" />
-        <StatCard icon={File} label="Total Files" value={stats.drafts} color="bg-orange-500/20" />
-        <StatCard icon={CheckCircle} label="Published" value={stats.completed} color="bg-green-500/20" />
+        <StatCard icon={Users} label="Total Audience" value={stats.totalFollowers} color="bg-purple-500/20" />
+        <StatCard icon={Activity} label="Engagement Rate" value={stats.engagementRate} color="bg-orange-500/20" />
+        <StatCard icon={Clock} label="Scheduled" value={stats.scheduled} color="bg-green-500/20" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
