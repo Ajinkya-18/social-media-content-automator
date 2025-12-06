@@ -68,14 +68,23 @@ export default function ImageGenerator() {
     if (!generatedImage) return;
     
     try {
-      const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(generatedImage)}`);
-      
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Download failed');
-      }
+      let blob: Blob;
 
-      const blob = await response.blob();
+      // Handle Data URI (Base64) directly
+      if (generatedImage.startsWith('data:')) {
+        const fetchRes = await fetch(generatedImage);
+        blob = await fetchRes.blob();
+      } 
+      // Handle Remote URL via Proxy
+      else {
+        const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(generatedImage)}`);
+        
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Download failed');
+        }
+        blob = await response.blob();
+      }
       
       if (blob.size === 0) {
         throw new Error('Invalid image data received');
@@ -107,7 +116,7 @@ export default function ImageGenerator() {
         } catch (err: any) {
           if (err.name !== 'AbortError') {
             console.error('File picker failed', err);
-            // Fallback to anchor tag if picker fails (but not if cancelled)
+            // Fallback to anchor tag if picker fails
           } else {
             return; // User cancelled
           }
