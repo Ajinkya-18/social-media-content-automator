@@ -1,26 +1,31 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const API_URL = process.env.NODE_ENV === "development"
+  ? "http://127.0.0.1:8000"
+  : "https://social-media-content-automator.onrender.com";
+
 const nextConfig: NextConfig = {
-  // 1. Strict Mode is good for dev
   reactStrictMode: true,
 
-  // 2. This is the Magic Bridge
   async rewrites() {
     return [
       {
-        // When frontend calls /api/python/...
         source: "/api/python/:path*",
-        // Next.js forwards it to http://127.0.0.1:8000/...
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/:path*"
-            : "https://social-media-content-automator.onrender.com/:path*",
+        destination: `${API_URL}/:path*`,
       },
+      // Fallback for direct API calls if needed (redundant but safe)
+      {
+        source: "/api/python/generate/image",
+        destination: `${API_URL}/generate/image`,
+      },
+      {
+        source: "/api/python/generate/text",
+        destination: `${API_URL}/generate/text`,
+      }
     ];
   },
   
-  // 3. Fix for Turbopack root resolution
   experimental: {
     // @ts-ignore - Turbopack root is valid but missing from types
     turbopack: {
