@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getAuthClient } from '../../../../lib/google';
 import { google } from 'googleapis';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../../../lib/auth";
 
 export async function GET() {
   try {
-    const auth = await getAuthClient();
+    const session = await getServerSession(authOptions);
+    // @ts-ignore
+    if (!session || !session.accessToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // @ts-ignore
+    const auth = await getAuthClient(session.accessToken);
     const drive = google.drive({ version: 'v3', auth });
 
     const response = await drive.files.list({
