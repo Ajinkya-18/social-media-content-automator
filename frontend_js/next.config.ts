@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
         destination:
           process.env.NODE_ENV === "development"
             ? "http://127.0.0.1:8000/:path*"
-            : "/api/python/:path*", // In production, this path changes (we'll tackle deployment later)
+            : "https://social-media-content-automator.onrender.com/:path*",
       },
     ];
   },
