@@ -19,7 +19,8 @@ export async function GET() {
     const response = await drive.files.list({
       pageSize: 20,
       fields: 'nextPageToken, files(id, name, mimeType, modifiedTime, size)',
-      q: "mimeType = 'application/vnd.google-apps.document' or mimeType = 'application/vnd.google-apps.spreadsheet'",
+      q: "(mimeType = 'application/vnd.google-apps.document' or mimeType = 'application/vnd.google-apps.spreadsheet') and trashed = false",
+      orderBy: 'modifiedTime desc',
     });
 
     const files = response.data.files?.map(file => ({

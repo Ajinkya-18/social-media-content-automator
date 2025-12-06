@@ -25,20 +25,6 @@ interface AppState {
     youtube: string;
   };
   setSocialProfile: (platform: 'twitter' | 'linkedin' | 'instagram' | 'youtube', url: string) => void;
-  // Drive Settings
-  driveSettings: {
-    plannerId: string | null;
-    plannerName: string | null;
-    scriptsId: string | null;
-    scriptsName: string | null;
-    imagesId: string | null;
-    imagesName: string | null;
-  };
-  setDriveSetting: (
-    type: 'planner' | 'scripts' | 'images', 
-    id: string | null, 
-    name: string | null
-  ) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -76,20 +62,5 @@ export const useAppStore = create<AppState>((set) => ({
   },
   setSocialProfile: (platform, url) => set((state) => ({
     socialProfiles: { ...state.socialProfiles, [platform]: url }
-  })),
-  driveSettings: {
-    plannerId: null,
-    plannerName: null,
-    scriptsId: null,
-    scriptsName: null,
-    imagesId: null,
-    imagesName: null,
-  },
-  setDriveSetting: (type, id, name) => set((state) => ({
-    driveSettings: {
-      ...state.driveSettings,
-      [`${type}Id`]: id,
-      [`${type}Name`]: name,
-    }
   })),
 }));

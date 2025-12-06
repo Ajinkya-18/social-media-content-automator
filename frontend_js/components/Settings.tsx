@@ -13,7 +13,6 @@ export default function Settings() {
   const { 
     googleDriveEnabled, googleSheetsEnabled, googleDocsEnabled, toggleGoogleService, setGoogleService,
     socialProfiles, setSocialProfile,
-    driveSettings, setDriveSetting
   } = useAppStore();
 
   const [folders, setFolders] = useState<any[]>([]);
@@ -125,77 +124,11 @@ export default function Settings() {
           )}
             {isAuthenticated && googleDriveEnabled && (
                 <div className="mt-4 pt-4 border-t border-white/10 space-y-6">
-                  
-                  {/* Planner Folder */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-300 mb-2 block">Planner Sheet Location</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-                      <button
-                        onClick={() => setDriveSetting('planner', null, null)}
-                        className={`p-3 rounded-lg text-sm text-center transition-colors ${!driveSettings.plannerId ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                      >
-                        Root Directory
-                      </button>
-                      {folders.map(folder => (
-                        <button
-                          key={folder.id}
-                          onClick={() => setDriveSetting('planner', folder.id, folder.name)}
-                          className={`p-3 rounded-lg text-sm text-center truncate transition-colors ${driveSettings.plannerId === folder.id ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                        >
-                          {folder.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Scripts Folder */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-300 mb-2 block">Scripts Location (Docs)</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-                      <button
-                        onClick={() => setDriveSetting('scripts', null, null)}
-                        className={`p-3 rounded-lg text-sm text-center transition-colors ${!driveSettings.scriptsId ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                      >
-                        Root Directory
-                      </button>
-                      {folders.map(folder => (
-                        <button
-                          key={`msg-${folder.id}`}
-                          onClick={() => setDriveSetting('scripts', folder.id, folder.name)}
-                          className={`p-3 rounded-lg text-sm text-center truncate transition-colors ${driveSettings.scriptsId === folder.id ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                        >
-                          {folder.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Images Folder */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-300 mb-2 block">Images Location</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-                      <button
-                        onClick={() => setDriveSetting('images', null, null)}
-                        className={`p-3 rounded-lg text-sm text-center transition-colors ${!driveSettings.imagesId ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                      >
-                        Root Directory
-                      </button>
-                      {folders.map(folder => (
-                        <button
-                          key={`img-${folder.id}`}
-                          onClick={() => setDriveSetting('images', folder.id, folder.name)}
-                          className={`p-3 rounded-lg text-sm text-center truncate transition-colors ${driveSettings.imagesId === folder.id ? 'bg-blue-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                        >
-                          {folder.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {loadingFolders && <p className="text-xs text-gray-500 mt-2">Loading folders...</p>}
+                  <p className="text-sm text-gray-400">
+                    You will be prompted to select a destination folder each time you save content to Google Drive.
+                  </p>
                 </div>
               )}
-
         </div>
       </div>
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">

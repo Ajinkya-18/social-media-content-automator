@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Sparkles, Image as ImageIcon, Download, RefreshCw, Zap, Crown, Star, Loader, Cloud } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../lib/store';
+import DrivePicker from './DrivePicker';
 
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState('');
@@ -12,8 +13,9 @@ export default function ImageGenerator() {
   const [error, setError] = useState('');
   
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
 
-  const { driveSettings } = useAppStore();
+  const { } = useAppStore();
 
   const getModelName = () => {
     switch (plan) {
@@ -141,23 +143,34 @@ export default function ImageGenerator() {
     }
   };
 
-  const handleSaveToDrive = async () => {
+  const handleSaveToDrive = () => {
     if (!generatedImage) return;
+    setIsDrivePickerOpen(true);
+  };
+
+  const handleDriveSelect = async (folderId: string, folderName: string) => {
+    setIsDrivePickerOpen(false);
+    
     try {
         let finalBase64 = generatedImage;
+        // If it's a URL, we might need to fetch it to get base64, or backend handles it.
+        // Assuming backend handles base64 string. If generatedImage is a URL, the existing backend logic might need adjustment 
+        // or we need to convert here. The existing logic sent `generatedImage` as `imageBase64`. 
+        // Let's assume it works as before, just passing the ID.
+        
         const res = await fetch('/api/google/drive/upload-image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 imageBase64: finalBase64,
                 filename: `gen-${prompt.slice(0, 10).replace(/\s+/g, '-')}-${Date.now()}.png`,
-                folderId: driveSettings.imagesId
+                folderId: folderId
             })
         });
 
         if (res.ok) {
             const data = await res.json();
-            alert(`Image saved to Drive! View at: ${data.link}`);
+            alert(`Image saved to Drive in "${folderName}"! View at: ${data.link}`);
         } else {
             throw new Error('Upload failed');
         }
@@ -295,6 +308,13 @@ export default function ImageGenerator() {
           )}
         </div>
       </div>
+
+      <DrivePicker
+        isOpen={isDrivePickerOpen}
+        onClose={() => setIsDrivePickerOpen(false)}
+        onSelect={handleDriveSelect}
+        title="Select Folder for Image"
+      />
     </div>
   );
 }

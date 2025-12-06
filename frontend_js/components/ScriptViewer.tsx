@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../lib/store';
 import { ArrowLeft, Save, Loader, Cloud } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import DrivePicker from './DrivePicker';
 import StarterKit from '@tiptap/starter-kit';
 import { EditorToolbar } from './EditorToolbar';
 
@@ -10,9 +11,10 @@ interface ScriptViewerProps {
 }
 
 export default function ScriptViewer({ onBack }: ScriptViewerProps) {
-  const { selectedFile, setCurrentView, fileSource, selectedFileId, driveSettings } = useAppStore();
+  const { selectedFile, setCurrentView, fileSource, selectedFileId } = useAppStore();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -68,20 +70,26 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
     }
   };
 
-  const handleSaveToDrive = async () => {
+  const handleSaveToDrive = () => {
+    setIsDrivePickerOpen(true);
+  };
+
+  const handleDriveSelect = async (folderId: string, folderName: string) => {
+    setIsDrivePickerOpen(false);
+    
     try {
       const res = await fetch('/api/google/drive/create-doc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             title: `Script - ${selectedFile || new Date().toISOString().split('T')[0]}`, 
-            content: editor?.getText() || content, // Send plain text for now as the API handles it
-            folderId: driveSettings.scriptsId
+            content: editor?.getText() || content, 
+            folderId: folderId
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`Script saved to Google Drive! View at: ${data.link}`);
+        alert(`Script saved to Google Drive in "${folderName}"! View at: ${data.link}`);
       } else {
         throw new Error('Failed to save to Drive');
       }
@@ -171,6 +179,13 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
           </>
         )}
       </div>
+
+      <DrivePicker
+        isOpen={isDrivePickerOpen}
+        onClose={() => setIsDrivePickerOpen(false)}
+        onSelect={handleDriveSelect}
+        title="Select Folder to Save Script"
+      />
     </div>
   );
 }

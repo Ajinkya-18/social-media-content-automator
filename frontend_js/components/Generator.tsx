@@ -5,6 +5,7 @@ import { Sparkles, Copy, RefreshCw, Save, Check, Instagram, Linkedin, Youtube, F
 import { motion } from 'framer-motion';
 import { InstagramPreview } from './previews/InstagramPreview';
 import { useAppStore } from '../lib/store';
+import DrivePicker from './DrivePicker';
 import { LinkedInPreview } from './previews/LinkedInPreview';
 import { YouTubeCommunityPreview } from './previews/YouTubeCommunityPreview';
 
@@ -44,7 +45,8 @@ export default function Generator() {
   const [saveDirectory, setSaveDirectory] = useState('content');
   const [showPreview, setShowPreview] = useState(false);
   const [isSavingDocs, setIsSavingDocs] = useState(false);
-  const { googleDocsEnabled, driveSettings } = useAppStore();
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
+  const { googleDocsEnabled } = useAppStore();
 
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
 
@@ -191,9 +193,15 @@ export default function Generator() {
     }
   };
 
-  const handleSaveToDocs = async () => {
+  const handleSaveToDocs = () => {
     if (!generatedContent) return;
+    setIsDrivePickerOpen(true);
+  };
+
+  const handleDriveSelect = async (folderId: string, folderName: string) => {
+    setIsDrivePickerOpen(false);
     setIsSavingDocs(true);
+
     try {
       const title = topic.split('\n')[0].slice(0, 50) || 'Untitled Content';
       const res = await fetch('/api/google/drive/create-doc', {
@@ -202,19 +210,19 @@ export default function Generator() {
         body: JSON.stringify({
           title,
           content: generatedContent,
-          folderId: driveSettings.scriptsId
+          folderId: folderId
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        alert(`Saved to Google Docs! View at: ${data.link}`); // Replace with better UI notification if possible, but alert is fine for now based on other components
+        alert(`Saved to Google Docs in "${folderName}"! View at: ${data.link}`); 
       } else {
         throw new Error('Failed to save to Docs');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Docs save error', e);
-      alert('Failed to save to Google Docs');
+      alert(`Failed to save to Google Docs: ${e.message}`);
     } finally {
       setIsSavingDocs(false);
     }
@@ -628,6 +636,14 @@ export default function Generator() {
           </div>
         </div>
       </div>
+      
+      {/* Drive Picker Modal */}
+      <DrivePicker
+        isOpen={isDrivePickerOpen}
+        onClose={() => setIsDrivePickerOpen(false)}
+        onSelect={handleDriveSelect}
+        title="Select Folder for Script"
+      />
     </div>
   );
 }

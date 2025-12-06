@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, Calendar, Hash, Type, Layout, Check, Loader } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Plus, Save, Calendar, Loader } from 'lucide-react';
 import { useAppStore } from '../lib/store';
+import DrivePicker from './DrivePicker';
 
 interface PlanItem {
   id: string;
@@ -16,6 +16,12 @@ export default function ContentCalendar() {
   const [items, setItems] = useState<PlanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
+  const [pendingSaveItem, setPendingSaveItem] = useState<PlanItem | null>(null);
+
+  const { googleSheetsEnabled } = useAppStore();
 
   useEffect(() => {
     fetchPlanner();
@@ -53,6 +59,9 @@ export default function ContentCalendar() {
 
   const handleSave = async (item: PlanItem) => {
     setSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+    
     try {
       // Save Locally
       await fetch('/api/local/planner', {
@@ -61,34 +70,52 @@ export default function ContentCalendar() {
         body: JSON.stringify(item),
       });
 
-      // Save to Google Sheets
-      const { googleSheetsEnabled, driveSettings } = useAppStore.getState();
-      
+      // Google Sheets Logic: Open Picker instead of auto-saving
       if (googleSheetsEnabled) {
-        try {
-          const res = await fetch('/api/google/sheets/write', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ item, folderId: driveSettings.plannerId }),
-          });
-          
-          if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.error || 'Unknown error');
-          }
-          
-          // Optional: Notify success for sheet
-          // console.log('Saved to sheets');
-        } catch (sheetError: any) {
-          console.error('Failed to save to Google Sheets', sheetError);
-          alert(`Saved locally, but failed to save to Google Sheets: ${sheetError.message}`);
-        }
+          setPendingSaveItem(item);
+          setIsDrivePickerOpen(true);
+      } else {
+          // Just local save success if Sheets disabled
+          setSaveSuccess('Saved to local planner');
+          setTimeout(() => setSaveSuccess(null), 3000);
       }
-
+      
     } catch (error) {
-      console.error('Failed to save', error);
+      console.error('Failed to save to local planner', error);
+      setSaveError('Failed to save locally');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDriveSelect = async (folderId: string, folderName: string) => {
+    setIsDrivePickerOpen(false);
+    if (!pendingSaveItem) return;
+
+    try {
+        setSaveSuccess('Saving to Sheets...'); // Show intermediate state
+        const res = await fetch('/api/google/sheets/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item: pendingSaveItem, folderId }),
+        });
+        
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to save to Sheets');
+        }
+        
+        setSaveSuccess(`Saved to local & Sheets (in ${folderName})`);
+        
+    } catch (err: any) {
+        console.error('Sheets Save Error', err);
+        setSaveError(`Saved locally, but failed to save to Google Sheets: ${err.message}`);
+    } finally {
+        setTimeout(() => {
+            setSaveSuccess(null);
+            setSaveError(null);
+        }, 5000);
+        setPendingSaveItem(null);
     }
   };
 
@@ -109,6 +136,18 @@ export default function ContentCalendar() {
           Add New Plan
         </button>
       </div>
+
+      {/* Notifications */}
+      {saveSuccess && (
+        <div className="p-3 bg-green-500/20 text-green-400 rounded-lg text-sm border border-green-500/30">
+            {saveSuccess}
+        </div>
+      )}
+      {saveError && (
+        <div className="p-3 bg-red-500/20 text-red-400 rounded-lg text-sm border border-red-500/30">
+            {saveError}
+        </div>
+      )}
 
       <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden backdrop-blur-sm">
         <div className="overflow-x-auto">
@@ -194,6 +233,13 @@ export default function ContentCalendar() {
           </table>
         </div>
       </div>
+      {/* Drive Picker Modal */}
+      <DrivePicker
+        isOpen={isDrivePickerOpen}
+        onClose={() => setIsDrivePickerOpen(false)}
+        onSelect={handleDriveSelect}
+        title="Select Folder for Planner Sheet"
+      />
     </div>
   );
 }

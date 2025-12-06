@@ -144,6 +144,6 @@ export async function POST(request: Request) {
     } catch (e) {
         console.error('Failed to write to error log', e);
     }
-    return NextResponse.json({ error: 'Failed to write to Google Sheets' }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
