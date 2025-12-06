@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Content Automation
+
+This project is an AI-powered content automation system featuring a **FastAPI** backend for image/content generation and a **Next.js** frontend for the user interface.
+
+## Project Structure
+
+- **`backend_api/`**: Python FastAPI application handling AI content generation (Gemini, Flux).
+- **`frontend_js/`**: Next.js (React) application for the user dashboard.
 
 ## Getting Started
 
-First, run the development server:
+### 1. Backend Setup (Python)
 
+Navigate to the backend directory:
+```bash
+cd backend_api
+```
+
+**Prerequisites:**
+- Python 3.8+
+- [Git](https://git-scm.com/)
+
+**Installation:**
+
+1.  Create a virtual environment:
+    ```bash
+    python -m venv venv
+    ```
+2.  Activate the virtual environment:
+    - **Windows:** `.\venv\Scripts\Activate`
+    - **Mac/Linux:** `source venv/bin/activate`
+3.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+**Configuration:**
+
+Create a `.env` file in the `backend_api` directory with the following keys:
+```ini
+GOOGLE_API_KEY=your_gemini_api_key
+HF_TOKEN=your_huggingface_token
+```
+
+**Run the Server:**
+```bash
+uvicorn app.main:app --reload
+```
+The backend API will be available at `http://localhost:8000`.
+
+### 2. Frontend Setup (Next.js)
+
+Navigate to the frontend directory:
+```bash
+cd frontend_js
+```
+
+**Prerequisites:**
+- Node.js 18+
+- npm, yarn, or pnpm
+
+**Installation:**
+
+Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+**Run the Development Server:**
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Image Generation**: Supports multiple plans (Free, Standard, Pro).
+    - **Free**: Uses Hugging Face (Flux).
+    - **Standard**: Uses Google Gemini 2.5 Flash.
+    - **Pro**: Uses Google Gemini 3 Pro.
