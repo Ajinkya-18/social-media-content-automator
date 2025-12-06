@@ -27,7 +27,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // @ts-ignore
       session.accessToken = token.accessToken;
       return session;
     },

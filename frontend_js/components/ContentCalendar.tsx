@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Save, Calendar, Loader } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { useAppStore } from '../lib/store';
-import DrivePicker from './DrivePicker';
+import GoogleDrivePicker from './GoogleDrivePicker';
 
 interface PlanItem {
   id: string;
@@ -22,6 +23,7 @@ export default function ContentCalendar() {
   const [pendingSaveItem, setPendingSaveItem] = useState<PlanItem | null>(null);
 
   const { googleSheetsEnabled } = useAppStore();
+  const { data: session } = useSession();
 
   useEffect(() => {
     fetchPlanner();
@@ -88,24 +90,40 @@ export default function ContentCalendar() {
     }
   };
 
-  const handleDriveSelect = async (folderId: string, folderName: string) => {
+  const handleDriveSelect = async (sheetId: string, sheetName: string) => {
     setIsDrivePickerOpen(false);
     if (!pendingSaveItem) return;
 
     try {
-        setSaveSuccess('Saving to Sheets...'); // Show intermediate state
-        const res = await fetch('/api/google/sheets/write', {
+        setSaveSuccess('Saving to Sheets...'); 
+        const token = (session as any)?.accessToken;
+        
+        const rowData = [
+            pendingSaveItem.date,
+            pendingSaveItem.platform,
+            pendingSaveItem.topic,
+            pendingSaveItem.prompt,
+            pendingSaveItem.status
+        ];
+
+        const res = await fetch('/api/python/google/sheet/append', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ item: pendingSaveItem, folderId }),
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({ 
+                spreadsheetId: sheetId,
+                rowData: rowData 
+            }),
         });
         
         if (!res.ok) {
             const errorData = await res.json();
-            throw new Error(errorData.error || 'Failed to save to Sheets');
+            throw new Error(errorData.detail || 'Failed to save to Sheets');
         }
         
-        setSaveSuccess(`Saved to local & Sheets (in ${folderName})`);
+        setSaveSuccess(`Saved to local & Sheets (in ${sheetName})`);
         
     } catch (err: any) {
         console.error('Sheets Save Error', err);
@@ -234,11 +252,12 @@ export default function ContentCalendar() {
         </div>
       </div>
       {/* Drive Picker Modal */}
-      <DrivePicker
+      <GoogleDrivePicker
         isOpen={isDrivePickerOpen}
         onClose={() => setIsDrivePickerOpen(false)}
         onSelect={handleDriveSelect}
-        title="Select Folder for Planner Sheet"
+        mode="pick-sheet"
+        title="Select Spreadsheet"
       />
     </div>
   );

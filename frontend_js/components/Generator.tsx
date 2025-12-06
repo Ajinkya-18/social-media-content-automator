@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Sparkles, Copy, RefreshCw, Save, Check, Instagram, Linkedin, Youtube, FileText, Hash, Eye, LayoutTemplate, Download, Share, Zap, Crown, Star, Loader } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { InstagramPreview } from './previews/InstagramPreview';
 import { useAppStore } from '../lib/store';
-import DrivePicker from './DrivePicker';
+import GoogleDrivePicker from './GoogleDrivePicker';
 import { LinkedInPreview } from './previews/LinkedInPreview';
 import { YouTubeCommunityPreview } from './previews/YouTubeCommunityPreview';
 
@@ -47,6 +48,7 @@ export default function Generator() {
   const [isSavingDocs, setIsSavingDocs] = useState(false);
   const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
   const { googleDocsEnabled } = useAppStore();
+  const { data: session } = useSession();
 
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
 
@@ -204,19 +206,25 @@ export default function Generator() {
 
     try {
       const title = topic.split('\n')[0].slice(0, 50) || 'Untitled Content';
-      const res = await fetch('/api/google/drive/create-doc', {
+      const token = (session as any)?.accessToken;
+      
+      const res = await fetch('/api/python/google/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
-          title,
+          fileName: title,
           content: generatedContent,
+          mimeType: 'application/vnd.google-apps.document',
           folderId: folderId
         })
       });
 
       if (res.ok) {
         const data = await res.json();
-        alert(`Saved to Google Docs in "${folderName}"! View at: ${data.link}`); 
+        alert(`Saved to Google Docs in "${folderName}"! View at: ${data.url}`); 
       } else {
         throw new Error('Failed to save to Docs');
       }
@@ -638,10 +646,11 @@ export default function Generator() {
       </div>
       
       {/* Drive Picker Modal */}
-      <DrivePicker
+      <GoogleDrivePicker
         isOpen={isDrivePickerOpen}
         onClose={() => setIsDrivePickerOpen(false)}
         onSelect={handleDriveSelect}
+        mode="pick-folder"
         title="Select Folder for Script"
       />
     </div>
