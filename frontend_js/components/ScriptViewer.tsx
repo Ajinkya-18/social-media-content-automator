@@ -10,7 +10,7 @@ interface ScriptViewerProps {
 }
 
 export default function ScriptViewer({ onBack }: ScriptViewerProps) {
-  const { selectedFile, setCurrentView, fileSource, selectedFileId, googleDriveFolderId } = useAppStore();
+  const { selectedFile, setCurrentView, fileSource, selectedFileId, driveSettings } = useAppStore();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +76,7 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
         body: JSON.stringify({ 
             title: `Script - ${selectedFile || new Date().toISOString().split('T')[0]}`, 
             content: editor?.getText() || content, // Send plain text for now as the API handles it
-            folderId: googleDriveFolderId
+            folderId: driveSettings.scriptsId
         }),
       });
       if (res.ok) {
