@@ -131,7 +131,6 @@ export default function DrivePicker({ isOpen, onClose, onSelect, title = 'Select
                     {folders.map((folder) => (
                         <button
                             key={folder.id}
-                            key={folder.id}
                             onClick={() => handleFolderClick(folder.id, folder.name)}
                             className="w-full flex items-center p-3 hover:bg-white/5 rounded-lg transition-colors group text-left"
                         >
