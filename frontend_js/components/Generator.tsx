@@ -81,28 +81,36 @@ export default function Generator() {
         }),
       });
       
-      let data;
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await res.json();
-      } else {
-        // Fallback for non-JSON errors (like 500 HTML pages)
-        const text = await res.text();
-        throw new Error(`Server Error: ${res.status} ${res.statusText}`); 
-      }
-      
       if (!res.ok) {
-        throw new Error(data?.detail || 'Generation failed');
-      }
-      
-      if (data && data.content) {
-          setGeneratedContent(data.content);
+        const contentType = res.headers.get("content-type");
+        let errorMessage = 'Generation failed';
+        
+        try {
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                const data = await res.json();
+                errorMessage = data?.detail || errorMessage;
+            } else {
+                const text = await res.text();
+                errorMessage = `Server Error: ${res.status} ${text || res.statusText}`;
+            }
+        } catch (e) {
+            errorMessage = `Server Error: ${res.status}`;
+        }
+        throw new Error(errorMessage);
       }
 
-      await readStream(res, (chunk) => {
-        setGeneratedContent((prev) => prev + chunk);
-      });
-
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+           const data = await res.json();
+           if (data && data.content) {
+              setGeneratedContent(data.content);
+           }
+      } else {
+          // Assume stream for non-JSON success responses (text/event-stream)
+          await readStream(res, (chunk) => {
+            setGeneratedContent((prev) => prev + chunk);
+          });
+      }
     } catch (err: any) {
       console.error('Generation failed', err);
       setError(err.message || 'Something went wrong');

@@ -20,10 +20,12 @@ API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):
-    if os.environ.get("backend_api_key"): # Only check if set
-        if api_key_header == os.environ.get("backend_api_key"):
+    env_api_key = os.environ.get("BACKEND_API_KEY")
+    if env_api_key: # Only check if set
+        if api_key_header == env_api_key:
             return api_key_header
         else:
+            print(f"Auth Failed: Received {api_key_header[:4]}... Expected {env_api_key[:4]}...")
             raise HTTPException(status_code=403, detail="Could not validate credentials")
     return api_key_header
 
@@ -80,7 +82,7 @@ class DownloadImageRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     print("Startup: Checking Environment Variables...")
-    keys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GEMINI_API_KEY", "HF_TOKEN", "backend_api_key"]
+    keys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GEMINI_API_KEY", "HF_TOKEN", "BACKEND_API_KEY"]
     for key in keys:
         val = os.environ.get(key)
         if val:
