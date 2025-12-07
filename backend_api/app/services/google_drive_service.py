@@ -49,6 +49,7 @@ async def upload_file_to_drive(access_token: str, file_name: str, content: str, 
 
     file_metadata = {
         'name': file_name,
+    }
     if folder_id:
         file_metadata['parents'] = [folder_id]
     
