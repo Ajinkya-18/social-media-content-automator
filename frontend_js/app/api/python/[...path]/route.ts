@@ -23,6 +23,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ pat
       headers['X-API-Key'] = process.env.BACKEND_API_KEY;
     }
 
+    // Forward Authorization Header (Critical for Google Drive)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader) {
+        headers['Authorization'] = authHeader;
+    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: headers,

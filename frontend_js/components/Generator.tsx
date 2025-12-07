@@ -85,6 +85,10 @@ export default function Generator() {
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         data = await res.json();
+      } else {
+        // Fallback for non-JSON errors (like 500 HTML pages)
+        const text = await res.text();
+        throw new Error(`Server Error: ${res.status} ${res.statusText}`); 
       }
       
       if (!res.ok) {

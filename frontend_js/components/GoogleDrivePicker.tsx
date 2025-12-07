@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Folder, FileSpreadsheet, File, X, ChevronRight, Check, ArrowLeft, Loader, Home } from 'lucide-react';
 
@@ -224,7 +224,15 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
             {error ? (
                 <div className="flex flex-col items-center justify-center h-40 text-red-400 p-4 text-center">
                     <p className="font-medium">Error</p>
-                    <p className="text-sm opacity-80">{error}</p>
+                    <p className="text-sm opacity-80 mb-4">{error}</p>
+                    {error.includes("Session Expired") && (
+                        <button 
+                            onClick={() => signIn('google')}
+                            className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm transition-colors"
+                        >
+                            Reconnect Account
+                        </button>
+                    )}
                 </div>
             ) : loading ? (
               <div className="flex items-center justify-center h-40">

@@ -20,10 +20,8 @@ async def list_drive_files(access_token: str, folder_id: str = None, mime_type: 
     if folder_id:
         query += f" and '{folder_id}' in parents"
     else:
-        # If no folder_id and no specific mime_type filter implying search, default to root or show shared drives?
-        # Standard behavior: show root if nothing specified
-        if not mime_type: 
-             query += " and 'root' in parents"
+        # Default to root if browsing top level
+        query += " and 'root' in parents"
     
     if mime_type == 'folder':
         query += " and mimeType = 'application/vnd.google-apps.folder'"
