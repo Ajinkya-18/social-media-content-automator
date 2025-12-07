@@ -2,11 +2,16 @@ from fastapi import FastAPI, HTTPException, Header, Depends, Security, Response
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 from app.services.llm_engine import generate_script_stream
 from app.services.image_engine import generate_image
 from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet, create_drive_folder
 from google.auth.exceptions import RefreshError
-
+from app.utils import create_docx, create_markdown
+from fastapi.responses import StreamingResponse
+import os
+import aiohttp
+import io
 # ...
 
 class DriveCreateFolderRequest(BaseModel):
@@ -43,15 +48,6 @@ async def create_folder_endpoint(req: DriveCreateFolderRequest, authorization: s
         raise HTTPException(status_code=500, detail=str(e))
 
 # ...
-
-
-
-from app.utils import create_docx, create_markdown
-from typing import Optional
-from fastapi.responses import StreamingResponse
-import os
-import aiohttp
-import io
 
 app = FastAPI(title="Nocturnal Brain")
 
@@ -217,3 +213,7 @@ async def download_image_endpoint(req: DownloadImageRequest):
     except Exception as e:
         print(f"Download Image Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
