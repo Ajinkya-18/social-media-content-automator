@@ -4,7 +4,48 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.services.llm_engine import generate_script_stream
 from app.services.image_engine import generate_image
-from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet
+from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet, create_drive_folder
+from google.auth.exceptions import RefreshError
+
+# ...
+
+class DriveCreateFolderRequest(BaseModel):
+    name: str
+    parentId: Optional[str] = None
+
+# ...
+
+@app.on_event("startup")
+async def startup_event():
+    print("Startup: Checking Environment Variables...")
+    keys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GEMINI_API_KEY", "HF_TOKEN", "backend_api_key"]
+    for key in keys:
+        val = os.environ.get(key)
+        if val:
+            masked = val[:4] + "*" * (len(val)-4) if len(val) > 4 else "****"
+            print(f"{key}: {masked}")
+        else:
+            print(f"{key}: NOT SET")
+
+@app.post("/google/create-folder")
+async def create_folder_endpoint(req: DriveCreateFolderRequest, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
+    
+    token = authorization.split(" ")[1]
+    try:
+        result = await create_drive_folder(token, req.name, req.parentId)
+        return result
+    except RefreshError:
+        raise HTTPException(status_code=401, detail="Google Token Expired")
+    except Exception as e:
+        print(f"Create Folder Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ...
+
+
+
 from app.utils import create_docx, create_markdown
 from typing import Optional
 from fastapi.responses import StreamingResponse
@@ -91,13 +132,15 @@ async def generate_image_endpoint(req: ImageRequest, api_key: str = Depends(get_
 
 @app.post("/google/list")
 async def list_files_endpoint(req: DriveListRequest, authorization: str = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
     
     token = authorization.split(" ")[1]
     try:
         files = await list_drive_files(token, req.folderId, req.mimeType)
         return {"files": files}
+    except RefreshError:
+        raise HTTPException(status_code=401, detail="Google Token Expired")
     except Exception as e:
         print(f"Drive List Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

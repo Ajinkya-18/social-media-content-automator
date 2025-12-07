@@ -49,9 +49,9 @@ async def upload_file_to_drive(access_token: str, file_name: str, content: str, 
 
     file_metadata = {
         'name': file_name,
-        'parents': [folder_id]
-    }
-
+    if folder_id:
+        file_metadata['parents'] = [folder_id]
+    
     if mime_type.startswith('image/'):
         # Decode base64 image
         # Remove header if present (e.g., "data:image/png;base64,")
@@ -97,3 +97,21 @@ async def append_row_to_sheet(access_token: str, spreadsheet_id: str, row_data: 
     ).execute()
 
     return {"updates": result.get('updates')}
+
+async def create_drive_folder(access_token: str, name: str, parent_id: str = None):
+    """
+    Creates a new folder in Google Drive.
+    """
+    creds = get_creds(access_token)
+    service = build('drive', 'v3', credentials=creds)
+
+    file_metadata = {
+        'name': name,
+        'mimeType': 'application/vnd.google-apps.folder'
+    }
+
+    if parent_id:
+        file_metadata['parents'] = [parent_id]
+
+    file = service.files().create(body=file_metadata, fields='id').execute()
+    return {"id": file.get('id')}

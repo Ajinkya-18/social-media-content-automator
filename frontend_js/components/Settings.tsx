@@ -27,10 +27,22 @@ export default function Settings() {
   const fetchFolders = async () => {
     setLoadingFolders(true);
     try {
-      const res = await fetch('/api/google/drive/folders');
+      const token = session?.accessToken;
+      if (!token) return;
+
+      // Just checking if we can fetch list to verify connection
+      const res = await fetch('/api/python/google/list', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ mimeType: 'folder' })
+      });
+
       if (res.ok) {
         const data = await res.json();
-        setFolders(data.folders || []);
+        setFolders(data.files || []);
       }
     } catch (error) {
       console.error('Failed to fetch folders', error);

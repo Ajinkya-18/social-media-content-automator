@@ -24,24 +24,34 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
   const { data: session } = useSession();
   const [items, setItems] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Navigation State
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null); // null means root
   const [breadcrumbs, setBreadcrumbs] = useState<{id: string | null, name: string}[]>([{ id: null, name: 'My Drive' }]);
 
+  // Create Folder State
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+
   useEffect(() => {
-    if (isOpen && session?.accessToken) {
-      fetchItems(currentFolderId);
+    if (isOpen) {
+        if (session?.accessToken) {
+             fetchItems(currentFolderId);
+        } else {
+             setError("Please sign in with Google to access Drive.");
+        }
     }
   }, [isOpen, currentFolderId, session]);
 
   const fetchItems = async (folderId: string | null) => {
     setLoading(true);
+    setError(null);
     try {
       const token = session?.accessToken;
       if (!token) return;
 
-      const res = await fetch('/api/python/google/list', { // Proxy to python backend
+      const res = await fetch('/api/python/google/list', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +59,6 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
         },
         body: JSON.stringify({
           folderId: folderId, 
-          // If picking folder, show folders. If picking sheet, show folders AND sheets.
           mimeType: mode === 'pick-folder' ? 'folder' : 'sheet' 
         })
       });
@@ -58,13 +67,49 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
         const data = await res.json();
         setItems(data.files || []);
       } else {
-        console.error('Failed to fetch drive items');
+        if (res.status === 401) {
+            setError("Session Expired - Please Re-connect Google Account");
+        } else {
+            const errText = await res.text();
+            setError(`Failed to fetch items: ${errText}`);
+        }
       }
     } catch (error) {
       console.error(error);
+      setError("Network or API error occurred.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateFolder = async () => {
+      if (!newFolderName.trim()) return;
+      
+      try {
+          const token = session?.accessToken;
+          const res = await fetch('/api/python/google/create-folder', {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                  name: newFolderName,
+                  parentId: currentFolderId 
+              })
+          });
+
+          if (res.ok) {
+              setNewFolderName("");
+              setIsCreatingFolder(false);
+              fetchItems(currentFolderId); // Refresh list
+          } else {
+              alert("Failed to create folder");
+          }
+      } catch (e) {
+          console.error(e);
+          alert("Error creating folder");
+      }
   };
 
   const handleNavigate = (folderId: string, folderName: string) => {
@@ -85,15 +130,12 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
   };
 
   const handleSelect = (item: DriveFile) => {
-    // If mode is pick-sheet, simply select the sheet
     if (mode === 'pick-sheet' && item.mimeType === 'application/vnd.google-apps.spreadsheet') {
        onSelect(item.id, item.name);
        onClose();
        return;
     }
     
-    // If mode is pick-folder, we select by clicking a "Select This Folder" button, NOT by clicking the folder item itself (which navigates).
-    // The current logic for files vs folders:
     if (item.mimeType === 'application/vnd.google-apps.folder') {
         handleNavigate(item.id, item.name);
     }
@@ -102,8 +144,6 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
   const handleConfirmCurrentFolder = () => {
     if (mode === 'pick-folder') {
         const current = breadcrumbs[breadcrumbs.length - 1];
-        // If current.id is null (root), API might expect 'root' or specific ID?
-        // Let's pass 'root' if null
         onSelect(current.id || 'root', current.name);
         onClose();
     }
@@ -129,10 +169,35 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
             <h3 className="text-lg font-bold text-white tracking-wide font-display">
               {title || (mode === 'pick-folder' ? 'Select Folder' : 'Select Spreadsheet')}
             </h3>
-            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
-              <X size={18} />
-            </button>
+            <div className="flex items-center space-x-2">
+                {mode === 'pick-folder' && !isCreatingFolder && (
+                    <button 
+                        onClick={() => setIsCreatingFolder(true)}
+                        className="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 rounded-md text-white transition-colors"
+                    >
+                        + New Folder
+                    </button>
+                )}
+                <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
+                  <X size={18} />
+                </button>
+            </div>
           </div>
+
+          {/* Create Folder Input */}
+          {isCreatingFolder && (
+              <div className="p-3 bg-white/5 border-b border-white/10 flex space-x-2">
+                  <input 
+                    autoFocus
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="Folder Name"
+                    className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+                  />
+                  <button onClick={handleCreateFolder} className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">Create</button>
+                  <button onClick={() => setIsCreatingFolder(false)} className="px-3 py-1 bg-transparent text-gray-400 text-sm hover:text-white">Cancel</button>
+              </div>
+          )}
 
           {/* Breadcrumbs */}
           <div className="px-4 py-3 bg-black/40 border-b border-white/5 flex items-center space-x-2 overflow-x-auto scrollbar-hide">
@@ -156,7 +221,12 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-2 min-h-[300px] custom-scrollbar">
-            {loading ? (
+            {error ? (
+                <div className="flex flex-col items-center justify-center h-40 text-red-400 p-4 text-center">
+                    <p className="font-medium">Error</p>
+                    <p className="text-sm opacity-80">{error}</p>
+                </div>
+            ) : loading ? (
               <div className="flex items-center justify-center h-40">
                 <Loader size={24} className="animate-spin text-blue-500" />
               </div>

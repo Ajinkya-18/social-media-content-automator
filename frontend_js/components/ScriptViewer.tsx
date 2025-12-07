@@ -76,13 +76,22 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
     setIsDrivePickerOpen(true);
   };
 
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // ...
+
   const handleDriveSelect = async (folderId: string, folderName: string) => {
     setIsDrivePickerOpen(false);
+    setSaving(true);
+    setSaveMessage("Saving to Drive...");
     
     try {
       const token = session?.accessToken;
       if (!token) {
           alert("No access token found. Please sign in again.");
+          setSaving(false);
+          setSaveMessage(null);
           return;
       }
 
@@ -101,13 +110,17 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`Script saved to Google Drive in "${folderName}"! View at: ${data.url}`);
+        setSaveMessage(`Saved to folder "${folderName}"!`);
+        setTimeout(() => setSaveMessage(null), 3000); // Clear after 3s
       } else {
         throw new Error('Failed to save to Drive');
       }
     } catch (e) {
       console.error('Drive save error', e);
-      alert('Failed to save to Drive');
+      setSaveMessage("Failed to save.");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } finally {
+        setSaving(false);
     }
   };
 
@@ -140,11 +153,16 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
         <div className="flex space-x-2">
             <button
                 onClick={handleSaveToDrive}
-                className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
+                disabled={saving}
+                className={`flex items-center px-4 py-2 ${saving ? 'bg-green-600/50' : 'bg-green-600 hover:bg-green-500'} text-white rounded-lg transition-colors`}
                 title="Save to Google Drive"
             >
-                <Cloud size={18} className="mr-2" />
-                Save to Drive
+                {saving ? (
+                    <Loader size={18} className="mr-2 animate-spin" />
+                ) : (
+                    <Cloud size={18} className="mr-2" />
+                )}
+                {saveMessage || "Save to Drive"}
             </button>
             <button 
             onClick={async () => {
