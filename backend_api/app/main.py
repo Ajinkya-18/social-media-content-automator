@@ -43,6 +43,21 @@ class ImageRequest(BaseModel):
     aspect_ratio:str = "1:1"
     plan:str = "free"
 
+
+class DriveListRequest(BaseModel):
+    folderId: Optional[str] = None
+    mimeType: Optional[str] = None
+
+class DriveUploadRequest(BaseModel):
+    fileName: str
+    content: str
+    mimeType: str
+    folderId: str
+
+class SheetAppendRequest(BaseModel):
+    spreadsheetId: str
+    rowData: list
+
 @app.get("/health")
 def health_check():
     return {"status": "operational", "system": "Nocturnal AI"}
@@ -62,45 +77,6 @@ async def generate_image_endpoint(req: ImageRequest, api_key: str = Depends(get_
     
     except Exception as e:
         raise HTTPException(status_code=500, detail="image generation failed. Please try again.")
-
-@app.post("/google/list")
-async def list_files_endpoint(req: DriveListRequest, authorization: str = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    
-    token = authorization.split(" ")[1]
-    try:
-        files = await list_drive_files(token, req.folderId, req.mimeType)
-        return {"files": files}
-    except Exception as e:
-        print(f"Drive List Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/google/upload")
-async def upload_file_endpoint(req: DriveUploadRequest, authorization: str = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    
-    token = authorization.split(" ")[1]
-    try:
-        result = await upload_file_to_drive(token, req.fileName, req.content, req.mimeType, req.folderId)
-        return result
-    except Exception as e:
-        print(f"Drive Upload Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/google/sheet/append")
-async def append_sheet_endpoint(req: SheetAppendRequest, authorization: str = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    
-    token = authorization.split(" ")[1]
-    try:
-        result = await append_row_to_sheet(token, req.spreadsheetId, req.rowData)
-        return result
-    except Exception as e:
-        print(f"Sheet Append Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/google/list")
 async def list_files_endpoint(req: DriveListRequest, authorization: str = Header(None)):
