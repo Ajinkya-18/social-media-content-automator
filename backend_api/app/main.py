@@ -12,42 +12,6 @@ from fastapi.responses import StreamingResponse
 import os
 import aiohttp
 import io
-# ...
-
-class DriveCreateFolderRequest(BaseModel):
-    name: str
-    parentId: Optional[str] = None
-
-# ...
-
-@app.on_event("startup")
-async def startup_event():
-    print("Startup: Checking Environment Variables...")
-    keys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GEMINI_API_KEY", "HF_TOKEN", "backend_api_key"]
-    for key in keys:
-        val = os.environ.get(key)
-        if val:
-            masked = val[:4] + "*" * (len(val)-4) if len(val) > 4 else "****"
-            print(f"{key}: {masked}")
-        else:
-            print(f"{key}: NOT SET")
-
-@app.post("/google/create-folder")
-async def create_folder_endpoint(req: DriveCreateFolderRequest, authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
-    
-    token = authorization.split(" ")[1]
-    try:
-        result = await create_drive_folder(token, req.name, req.parentId)
-        return result
-    except RefreshError:
-        raise HTTPException(status_code=401, detail="Google Token Expired")
-    except Exception as e:
-        print(f"Create Folder Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ...
 
 app = FastAPI(title="Nocturnal Brain")
 
@@ -71,6 +35,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Pydantic Models ---
+
+class DriveCreateFolderRequest(BaseModel):
+    name: str
+    parentId: Optional[str] = None
+
 class TextRequest(BaseModel):
     topic: str
     platform: str
@@ -81,7 +51,6 @@ class ImageRequest(BaseModel):
     prompt: str
     aspect_ratio:str = "1:1"
     plan:str = "free"
-
 
 class DriveListRequest(BaseModel):
     folderId: Optional[str] = None
@@ -106,9 +75,38 @@ class DownloadImageRequest(BaseModel):
     url: str
     filename: str = "image.png"
 
+# --- Endpoints ---
+
+@app.on_event("startup")
+async def startup_event():
+    print("Startup: Checking Environment Variables...")
+    keys = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GEMINI_API_KEY", "HF_TOKEN", "backend_api_key"]
+    for key in keys:
+        val = os.environ.get(key)
+        if val:
+            masked = val[:4] + "*" * (len(val)-4) if len(val) > 4 else "****"
+            print(f"{key}: {masked}")
+        else:
+            print(f"{key}: NOT SET")
+
 @app.get("/health")
 def health_check():
     return {"status": "operational", "system": "Nocturnal AI"}
+
+@app.post("/google/create-folder")
+async def create_folder_endpoint(req: DriveCreateFolderRequest, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
+    
+    token = authorization.split(" ")[1]
+    try:
+        result = await create_drive_folder(token, req.name, req.parentId)
+        return result
+    except RefreshError:
+        raise HTTPException(status_code=401, detail="Google Token Expired")
+    except Exception as e:
+        print(f"Create Folder Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/generate/text")
 async def generate_text_endpoint(req: TextRequest, api_key: str = Depends(get_api_key)):
@@ -213,7 +211,3 @@ async def download_image_endpoint(req: DownloadImageRequest):
     except Exception as e:
         print(f"Download Image Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
