@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Folder, FileText, HardDrive, Cloud, Trash2, Download } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { useAppStore } from '../lib/store';
 import ScriptViewer from './ScriptViewer';
 
@@ -22,6 +23,7 @@ export default function Scripts() {
     googleDriveEnabled
   } = useAppStore();
   
+  const { data: session } = useSession();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'edit'>('list');
@@ -30,7 +32,7 @@ export default function Scripts() {
     if (viewMode === 'list') {
       fetchFiles();
     }
-  }, [fileSource, viewMode]);
+  }, [fileSource, viewMode, session]);
 
   // If a file is already selected when mounting, show edit mode
   useEffect(() => {
@@ -41,12 +43,48 @@ export default function Scripts() {
 
   const fetchFiles = async () => {
     setLoading(true);
+    setFiles([]); // Clear previous
     try {
-      const endpoint = fileSource === 'local' ? '/api/local/files' : '/api/google/drive';
-      const res = await fetch(endpoint);
-      const data = await res.json();
-      if (data.files) {
-        setFiles(data.files);
+      if (fileSource === 'local') {
+          const res = await fetch('/api/local/files');
+          const data = await res.json();
+          if (data.files) setFiles(data.files);
+      } else {
+           // Google Drive Fetch
+           const token = (session as any)?.accessToken;
+           if (!token) {
+             console.warn("No token available for drive fetch");
+             setLoading(false);
+             return;
+           }
+           
+           try {
+             // Fetch all files (mimeType: null)
+             const res = await fetch('/api/python/google/list', {
+                 method: 'POST',
+                 headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                 },
+                 body: JSON.stringify({ mimeType: null }) 
+             });
+             
+             if (res.ok) {
+                 const data = await res.json();
+                 if (data.files) {
+                     setFiles(data.files.map((f: any) => ({
+                         id: f.id,
+                         name: f.name,
+                         type: f.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file',
+                         mimeType: f.mimeType
+                     })));
+                 }
+             } else {
+                 console.error("Drive API returned error", await res.text());
+             }
+           } catch (e) {
+             console.error("Drive fetch failed", e);
+           }
       }
     } catch (error) {
       console.error('Failed to fetch files', error);

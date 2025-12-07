@@ -1,6 +1,6 @@
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 import base64
 
@@ -131,3 +131,31 @@ async def create_drive_folder(access_token: str, name: str, parent_id: str = Non
 
     file = service.files().create(body=file_metadata, fields='id').execute()
     return {"id": file.get('id')}
+
+async def read_file_from_drive(access_token: str, file_id: str):
+    """
+    Reads a file from Google Drive.
+    If it's a Google Doc, exports it as text.
+    If it's a regular file, downloads the content.
+    """
+    creds = get_creds(access_token)
+    service = build('drive', 'v3', credentials=creds)
+
+    # First get metadata to check mimeType
+    file_metadata = service.files().get(fileId=file_id, fields="mimeType, name").execute()
+    mime_type = file_metadata.get('mimeType')
+
+    if mime_type == 'application/vnd.google-apps.document':
+        # Export Google Doc as plain text
+        request = service.files().export_media(fileId=file_id, mimeType='text/plain')
+    else:
+        # Download regular file (e.g. text/markdown)
+        request = service.files().get_media(fileId=file_id)
+
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while done is False:
+        status, done = downloader.next_chunk()
+
+    return {"content": fh.getvalue().decode('utf-8'), "name": file_metadata.get('name')}

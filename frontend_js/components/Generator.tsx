@@ -703,24 +703,7 @@ export default function Generator() {
                   </button>
                 )}
                 
-                <button 
-                  onClick={openSaveOptions}
-                  disabled={isSaving || saveSuccess}
-                  className={`ml-2 flex items-center px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
-                    saveSuccess 
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                      : 'bg-blue-600 hover:bg-blue-500 text-white border border-transparent text-white'
-                  }`}
-                >
-                  {isSaving ? (
-                    <RefreshCw size={14} className="animate-spin mr-2" />
-                  ) : saveSuccess ? (
-                    <Check size={14} className="mr-2" />
-                  ) : (
-                    <Save size={14} className="mr-2" />
-                  )}
-                  {saveSuccess ? 'Saved' : 'Save'}
-                </button>
+
               </div>
             )}
           </div>

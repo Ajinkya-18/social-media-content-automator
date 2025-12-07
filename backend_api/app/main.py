@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.services.llm_engine import generate_script_stream
 from app.services.image_engine import generate_image
-from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet, create_drive_folder
+from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet, create_drive_folder, read_file_from_drive
 from google.auth.exceptions import RefreshError
 from app.utils import create_docx, create_markdown
 from fastapi.responses import StreamingResponse
@@ -145,7 +145,43 @@ async def list_files_endpoint(req: DriveListRequest, authorization: str = Header
         print(f"Drive List Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/google/upload")
+@app.post("/google/read")
+async def read_drive_file_endpoint(req: DriveListRequest, authorization: str = Header(None)):
+    """
+    Reusing DriveListRequest for simplicity as it has folderId/fileId conceptually.
+    Actually let's look at DriveListRequest: folderId, mimeType.
+    We should probably make a new request model or reuse simpler args.
+    Let's just use query param for fileId? Or reuse DriveListRequest(folderId=fileId).
+    Let's stick to POST for consistency, but maybe define a new model or just assume 'folderId' is the fileId here.
+    Better: Define a simple model.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
+    
+    token = authorization.split(" ")[1]
+    
+    # We'll use folderId as fileId for now to avoid creating new model if possible, 
+    # BUT creating a new model is cleaner.
+    # Let's create 'DriveReadRequest' just above this function or use query params.
+    # Actually, let's use query params for GET request since it's a read operation.
+    # But for consistency with auth header handling we've been using POST for some reason?
+    # No, GET is fine with Auth header.
+    pass
+
+@app.get("/google/read")
+async def read_drive_file_get(fileId: str, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
+    
+    token = authorization.split(" ")[1]
+    try:
+        result = await read_file_from_drive(token, fileId)
+        return result
+    except RefreshError:
+        raise HTTPException(status_code=401, detail="Google Token Expired")
+    except Exception as e:
+        print(f"Drive Read Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 async def upload_file_endpoint(req: DriveUploadRequest, authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")

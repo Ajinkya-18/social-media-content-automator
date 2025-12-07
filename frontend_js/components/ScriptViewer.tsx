@@ -41,25 +41,33 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
       let url = '';
       if (fileSource === 'local') {
         url = `/api/local/read?filename=${encodeURIComponent(selectedFile)}`;
-      } else if (fileSource === 'google' && selectedFileId) {
-        url = `/api/google/docs?fileId=${selectedFileId}`;
-      }
-
-      if (url) {
         fetch(url)
           .then(res => res.json())
           .then(data => {
             const newContent = data.content || '';
             setContent(newContent);
-            if (editor) {
-              editor.commands.setContent(newContent);
-            }
+            if (editor) editor.commands.setContent(newContent);
             setLoading(false);
           })
-          .catch(err => {
-            console.error(err);
-            setLoading(false);
-          });
+          .catch(err => { console.error(err); setLoading(false); });
+      } else if (fileSource === 'google' && selectedFileId) {
+        const token = (session as any)?.accessToken;
+        if (token) {
+            // Using the GET endpoint we created
+            fetch(`/api/python/google/read?fileId=${selectedFileId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const newContent = data.content || '';
+                setContent(newContent);
+                if (editor) editor.commands.setContent(newContent);
+                setLoading(false);
+            })
+            .catch(err => { console.error(err); setLoading(false); });
+        } else {
+             setLoading(false);
+        }
       }
     }
   }, [selectedFile, fileSource, selectedFileId, editor]);
