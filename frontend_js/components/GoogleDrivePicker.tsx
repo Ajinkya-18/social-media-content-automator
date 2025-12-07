@@ -59,7 +59,7 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
         },
         body: JSON.stringify({
           folderId: folderId, 
-          mimeType: mode === 'pick-folder' ? 'folder' : 'sheet' 
+          mimeType: mode === 'pick-folder' ? null : 'sheet' 
         })
       });
 
@@ -245,27 +245,37 @@ export default function GoogleDrivePicker({ isOpen, onClose, onSelect, mode, tit
                </div>
             ) : (
               <div className="space-y-1">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const isFolder = item.mimeType === 'application/vnd.google-apps.folder';
+                  const isSheet = item.mimeType === 'application/vnd.google-apps.spreadsheet';
+                  const canSelect = (mode === 'pick-folder' && isFolder) || (mode === 'pick-sheet' && isSheet);
+                  
+                  return (
                   <button
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className="w-full flex items-center p-3 hover:bg-white/5 rounded-xl transition-all group text-left border border-transparent hover:border-white/5"
+                    className={`w-full flex items-center p-3 hover:bg-white/5 rounded-xl transition-all group text-left border border-transparent hover:border-white/5 ${
+                        !isFolder && mode === 'pick-folder' ? 'opacity-50' : ''
+                    }`}
                   >
                     <div className={`p-2.5 rounded-lg mr-3 transition-colors ${
-                      item.mimeType === 'application/vnd.google-apps.folder' 
+                      isFolder 
                         ? 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20' 
-                        : 'bg-green-500/10 text-green-400 group-hover:bg-green-500/20'
+                        : isSheet
+                            ? 'bg-green-500/10 text-green-400 group-hover:bg-green-500/20'
+                            : 'bg-gray-500/10 text-gray-400 group-hover:bg-gray-500/20'
                     }`}>
-                      {item.mimeType === 'application/vnd.google-apps.folder' ? <Folder size={20} /> : <FileSpreadsheet size={20} />}
+                      {isFolder ? <Folder size={20} /> : isSheet ? <FileSpreadsheet size={20} /> : <File size={20} />}
                     </div>
                     <div className="flex-1 truncate">
-                       <p className="text-sm font-medium text-gray-200 group-hover:text-white">{item.name}</p>
+                       <p className={`text-sm font-medium ${isFolder || (isSheet && mode === 'pick-sheet') ? 'text-gray-200 group-hover:text-white' : 'text-gray-500'}`}>{item.name}</p>
                     </div>
-                    {item.mimeType === 'application/vnd.google-apps.folder' && (
+                    {isFolder && (
                         <ChevronRight size={16} className="text-gray-600 group-hover:text-gray-400" />
                     )}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

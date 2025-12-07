@@ -21,10 +21,10 @@ export default function ImageGenerator() {
 
   const getModelName = () => {
     switch (plan) {
-      case 'free': return 'FLUX.1 Schnell';
-      case 'standard': return 'Gemini 1.5 Flash';
-      case 'pro': return 'Imagen 3 High-Fidelity';
-      default: return 'FLUX.1 Schnell';
+      case 'free': return 'FLUX.1-schnell';
+      case 'standard': return 'gemini-2.5-flash-image';
+      case 'pro': return 'gemini-3-pro-image-preview';
+      default: return 'FLUX.1-schnell';
     }
   };
 

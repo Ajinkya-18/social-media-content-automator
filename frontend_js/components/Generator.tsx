@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { Sparkles, Copy, RefreshCw, Save, Check, Instagram, Linkedin, Youtube, FileText, Hash, Eye, LayoutTemplate, Download, Share, Zap, Crown, Star, Loader } from 'lucide-react';
+import { Sparkles, Copy, RefreshCw, Save, Check, Instagram, Linkedin, Youtube, FileText, Hash, Eye, LayoutTemplate, Download, Share, Zap, Crown, Star, Loader, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { InstagramPreview } from './previews/InstagramPreview';
 import { useAppStore } from '../lib/store';
@@ -48,16 +48,75 @@ export default function Generator() {
   const [isSavingDocs, setIsSavingDocs] = useState(false);
   const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
   const { googleDocsEnabled } = useAppStore();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  
+  // Session Expiry Handling
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+
+  useEffect(() => {
+    // specific check: if we were authenticated but now are not, and we have work in progress
+    if (status === 'unauthenticated' && (topic.trim() || generatedContent)) {
+       setIsSessionExpired(true);
+    }
+    // Also check if we have a session but no access token (Google Token expired)
+    // Note: session.accessToken might be undefined if key is different, check `any` cast
+    const token = (session as any)?.accessToken;
+    if (status === 'authenticated' && session && !token && (topic.trim() || generatedContent)) {
+       setIsSessionExpired(true);
+    }
+  }, [session, status, topic, generatedContent]);
+
+  const handleReconnect = () => {
+    // Open sign in in a new tab to preserve current page state
+    // Use a blank page or google signin directly
+    // Ideally we want to trigger the signin flow without navigating away
+    // Using a popup window is standard for re-auth
+    const width = 500;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    // We simply open the signin page. 
+    // The user will sign in there.
+    window.open('/api/auth/signin', 'Re-Authenticate', `width=${width},height=${height},left=${left},top=${top}`);
+    
+    // Polling to check if session is restored
+    const interval = setInterval(async () => {
+        // We need to force update the session
+        // reload() from useSession hook isn't exposed directly in this version easily without re-mounting
+        // but we can try fetching the session endpoint
+        try {
+            const res = await fetch('/api/auth/session');
+            const data = await res.json();
+            
+            // If we get a valid session with a token
+            if (data && Object.keys(data).length > 0 && data.accessToken) {
+                clearInterval(interval);
+                setIsSessionExpired(false);
+                // Trigger a full page reload to sync everything cleanly? 
+                // Or just let them continue. 
+                // Let's alert them.
+                alert("Session Connection Restored! You can continue working.");
+                // We might need to refresh the page state to get the new token into the `useSession` hook
+                // But doing so loses state. 
+                // Ideally, `next-auth` polling picks it up. 
+                // We'll let the provider polling (set to 60s) or manual action handle it?
+                // Actually, let's force a reload if they want, OR if the hook updates.
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, 2000);
+  };
 
   const [plan, setPlan] = useState<'free' | 'standard' | 'pro'>('free');
 
   const getModelName = () => {
     switch (plan) {
-      case 'free': return 'Mistral 7B (Open Source)';
-      case 'standard': return 'Gemini 1.5 Flash';
-      case 'pro': return 'Gemini 1.5 Pro (Reasoning)';
-      default: return 'Mistral 7B';
+      case 'free': return 'Llama-3.1-8B-Instruct';
+      case 'standard': return 'gemini-2.5-flash';
+      case 'pro': return 'gemini-3-pro-preview';
+      default: return 'Llama-3.1-8B-Instruct';
     }
   };
 
@@ -254,34 +313,47 @@ export default function Generator() {
 
     const filename = `${platform}_${topic.slice(0, 20).replace(/\s+/g, '_')}_${Date.now()}.md`;
 
+    const downloadFallback = () => {
+        try {
+            const blob = new Blob([generatedContent], { type: 'text/markdown' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error("Fallback download failed", e);
+            alert("Failed to download file.");
+        }
+    };
+
     try {
       if ('showSaveFilePicker' in window) {
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: filename,
-          types: [{
-            description: 'Markdown File',
-            accept: { 'text/markdown': ['.md'] },
-          }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(generatedContent);
-        await writable.close();
+        try {
+            const handle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+                description: 'Markdown File',
+                accept: { 'text/markdown': ['.md'] },
+            }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(generatedContent);
+            await writable.close();
+        } catch (err: any) {
+            if (err.name === 'AbortError') return;
+            console.warn("File Picker API failed, trying fallback...", err);
+            downloadFallback();
+        }
       } else {
-        // Fallback
-        const blob = new Blob([generatedContent], { type: 'text/markdown' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        downloadFallback();
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.error('Export failed', err);
-      }
+      console.error('Export failed', err);
+      downloadFallback();
     }
   };
 
@@ -304,6 +376,34 @@ export default function Generator() {
 
   return (
     <div className="max-w-[1400px] mx-auto h-[calc(100vh-100px)] flex flex-col relative p-6">
+      {/* Session Expired Modal */}
+      {isSessionExpired && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 rounded-2xl">
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-[#1a1a1a] border border-red-500/30 w-full max-w-md p-6 rounded-2xl shadow-2xl"
+            >
+                <div className="flex items-center text-red-400 mb-4">
+                    <AlertTriangle size={24} className="mr-3" />
+                    <h3 className="text-xl font-bold">Session Expired</h3>
+                </div>
+                <p className="text-gray-300 mb-6 leading-relaxed">
+                    Your session has expired. To prevent losing your current work, please sign in again in a new window.
+                </p>
+                <button 
+                    onClick={handleReconnect}
+                    className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-purple-500/20 mb-3"
+                >
+                    Sign In (New Window)
+                </button>
+                <p className="text-xs text-gray-500 text-center">
+                    After signing in, this message will disappear automatically.
+                </p>
+            </motion.div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-8 flex justify-between items-center">
         <div>
