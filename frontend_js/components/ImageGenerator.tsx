@@ -155,7 +155,12 @@ export default function ImageGenerator() {
     
     try {
         let finalBase64 = generatedImage;
-        const token = (session as any)?.accessToken;
+        const token = session?.accessToken;
+        
+        if (!token) {
+            alert('No access token found. Please sign in again.');
+            return;
+        }
         
         const res = await fetch('/api/python/google/upload', {
             method: 'POST',

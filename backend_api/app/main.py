@@ -1,14 +1,16 @@
-from fastapi import FastAPI, HTTPException, Header, Depends, Security
+from fastapi import FastAPI, HTTPException, Header, Depends, Security, Response
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.services.llm_engine import generate_script_stream
-from app.services.llm_engine import generate_script_stream
 from app.services.image_engine import generate_image
 from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet
+from app.utils import create_docx, create_markdown
 from typing import Optional
 from fastapi.responses import StreamingResponse
 import os
+import aiohttp
+import io
 
 app = FastAPI(title="Nocturnal Brain")
 
@@ -57,6 +59,15 @@ class DriveUploadRequest(BaseModel):
 class SheetAppendRequest(BaseModel):
     spreadsheetId: str
     rowData: list
+
+class DownloadScriptRequest(BaseModel):
+    content: str
+    format: str # "docx" or "md"
+    filename: str = "script"
+
+class DownloadImageRequest(BaseModel):
+    url: str
+    filename: str = "image.png"
 
 @app.get("/health")
 def health_check():
@@ -117,3 +128,49 @@ async def append_sheet_endpoint(req: SheetAppendRequest, authorization: str = He
         print(f"Sheet Append Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/download/script")
+async def download_script_endpoint(req: DownloadScriptRequest):
+    try:
+        if req.format == "docx":
+            file_stream = create_docx(req.content)
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            extension = "docx"
+        elif req.format == "md":
+            file_stream = create_markdown(req.content)
+            media_type = "text/markdown"
+            extension = "md"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid format. Use 'docx' or 'md'.")
+        
+        filename = f"{req.filename}.{extension}"
+        
+        # Helper to yield chunks from BytesIO
+        def iterfile():
+            yield file_stream.read()
+
+        headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
+        
+        return StreamingResponse(iterfile(), media_type=media_type, headers=headers)
+
+    except Exception as e:
+        print(f"Download Script Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/download/image")
+async def download_image_endpoint(req: DownloadImageRequest):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(req.url) as response:
+                if response.status != 200:
+                    raise HTTPException(status_code=500, detail="Failed to fetch image.")
+                
+                content = await response.read()
+                
+        return Response(content=content, media_type="image/png", headers={
+            "Content-Disposition": f'attachment; filename="{req.filename}"'
+        })
+    except Exception as e:
+        print(f"Download Image Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

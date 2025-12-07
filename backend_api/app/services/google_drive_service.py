@@ -58,7 +58,12 @@ async def upload_file_to_drive(access_token: str, file_name: str, content: str, 
         if "base64," in content:
             content = content.split("base64,")[1]
         
-        file_data = base64.b64decode(content)
+        try:
+            file_data = base64.b64decode(content)
+        except Exception as e:
+            # If decoration fails, maybe it wasn't base64 or was corrupted
+            raise ValueError(f"Invalid base64 content: {e}")
+
         media = MediaIoBaseUpload(io.BytesIO(file_data), mimetype=mime_type)
     else:
         # Text/Markdown

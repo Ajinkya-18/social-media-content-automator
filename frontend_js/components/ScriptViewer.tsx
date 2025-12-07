@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../lib/store';
 import { ArrowLeft, Save, Loader, Cloud } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
-import DrivePicker from './DrivePicker';
+import GoogleDrivePicker from './GoogleDrivePicker';
+import { useSession } from 'next-auth/react';
 import StarterKit from '@tiptap/starter-kit';
 import { EditorToolbar } from './EditorToolbar';
 
@@ -12,6 +13,7 @@ interface ScriptViewerProps {
 
 export default function ScriptViewer({ onBack }: ScriptViewerProps) {
   const { selectedFile, setCurrentView, fileSource, selectedFileId } = useAppStore();
+  const { data: session } = useSession();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [isDrivePickerOpen, setIsDrivePickerOpen] = useState(false);
@@ -78,18 +80,28 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
     setIsDrivePickerOpen(false);
     
     try {
-      const res = await fetch('/api/google/drive/create-doc', {
+      const token = session?.accessToken;
+      if (!token) {
+          alert("No access token found. Please sign in again.");
+          return;
+      }
+
+      const res = await fetch('/api/python/google/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ 
-            title: `Script - ${selectedFile || new Date().toISOString().split('T')[0]}`, 
+            fileName: `Script - ${selectedFile || new Date().toISOString().split('T')[0]}.md`, 
             content: editor?.getText() || content, 
+            mimeType: "text/markdown",
             folderId: folderId
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`Script saved to Google Drive in "${folderName}"! View at: ${data.link}`);
+        alert(`Script saved to Google Drive in "${folderName}"! View at: ${data.url}`);
       } else {
         throw new Error('Failed to save to Drive');
       }
@@ -180,10 +192,11 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
         )}
       </div>
 
-      <DrivePicker
+      <GoogleDrivePicker
         isOpen={isDrivePickerOpen}
         onClose={() => setIsDrivePickerOpen(false)}
         onSelect={handleDriveSelect}
+        mode="pick-folder"
         title="Select Folder to Save Script"
       />
     </div>
