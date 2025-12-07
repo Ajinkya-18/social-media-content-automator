@@ -83,7 +83,17 @@ async def append_row_to_sheet(access_token: str, spreadsheet_id: str, row_data: 
     creds = get_creds(access_token)
     service = build('sheets', 'v4', credentials=creds)
 
-    range_name = 'Sheet1!A1' # Default to appending to the first sheet
+    # dynamic sheet name resolution
+    spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    try:
+        sheet_title = spreadsheet['sheets'][0]['properties']['title']
+        # Handle special characters in sheet title by quoting it if necessary, 
+        # but the API handles loose matching often. Safe practice is single quotes.
+        # However, the API expects 'Sheet Name'!A1
+        range_name = f"'{sheet_title}'!A1"
+    except (KeyError, IndexError):
+        range_name = 'Sheet1!A1' # Fallback
+
     body = {
         'values': [row_data]
     }
