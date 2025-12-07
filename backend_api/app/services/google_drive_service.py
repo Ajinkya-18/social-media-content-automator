@@ -51,6 +51,13 @@ async def upload_file_to_drive(access_token: str, file_name: str, content: str, 
     if folder_id:
         file_metadata['parents'] = [folder_id]
     
+    if mime_type == 'application/vnd.google-apps.document':
+        # Conversion case: Creating a Google Doc from text
+        file_metadata['mimeType'] = mime_type
+        upload_mime_type = 'text/plain'
+    else:
+        upload_mime_type = mime_type
+
     if mime_type.startswith('image/'):
         # Decode base64 image
         # Remove header if present (e.g., "data:image/png;base64,")
@@ -66,7 +73,7 @@ async def upload_file_to_drive(access_token: str, file_name: str, content: str, 
         media = MediaIoBaseUpload(io.BytesIO(file_data), mimetype=mime_type)
     else:
         # Text/Markdown
-        media = MediaIoBaseUpload(io.BytesIO(content.encode('utf-8')), mimetype=mime_type)
+        media = MediaIoBaseUpload(io.BytesIO(content.encode('utf-8')), mimetype=upload_mime_type)
 
     file = service.files().create(
         body=file_metadata,
