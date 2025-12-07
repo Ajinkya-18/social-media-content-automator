@@ -42,9 +42,10 @@ async def generate_script_stream(topic: str, platform:str, tone:str, plan:str) -
             )
 
             async for chunk in stream:
-                content = chunk.choices[0].delta.content
-                if content:
-                    yield content
+                if chunk.choices and len(chunk.choices) > 0:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        yield content
             
         elif plan == "standard":
             response = google_client.models.generate_content_stream(

@@ -91,6 +91,10 @@ async def startup_event():
         else:
             print(f"{key}: NOT SET")
 
+@app.get("/")
+def root():
+    return {"status": "online", "message": "Nocturnal Brain API is Running"}
+
 @app.get("/health")
 def health_check():
     return {"status": "operational", "system": "Nocturnal AI"}

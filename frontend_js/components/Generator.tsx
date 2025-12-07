@@ -238,7 +238,8 @@ export default function Generator() {
         const data = await res.json();
         alert(`Saved to Google Docs in "${folderName}"! View at: ${data.url}`); 
       } else {
-        throw new Error('Failed to save to Docs');
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to save to Docs');
       }
     } catch (e: any) {
       console.error('Docs save error', e);
