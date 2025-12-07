@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-google_client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+google_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 hf_client = AsyncInferenceClient(token=os.environ.get("HF_TOKEN"))
 
 async def generate_script_stream(topic: str, platform:str, tone:str, plan:str) -> AsyncGenerator[str, None]:

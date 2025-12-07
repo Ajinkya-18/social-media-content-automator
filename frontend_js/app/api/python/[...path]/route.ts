@@ -35,10 +35,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ pat
       body: JSON.stringify(body),
     });
 
-    // Proxy the response back
-    const data = await res.json();
-    
-    return NextResponse.json(data, { status: res.status });
+    // Proxy the response back (supports streams)
+    return new NextResponse(res.body, {
+        status: res.status,
+        headers: {
+            'Content-Type': res.headers.get('Content-Type') || 'application/json',
+        }
+    });
   } catch (error) {
     console.error('Proxy Error:', error);
     return NextResponse.json({ error: 'Failed to proxy request' }, { status: 500 });
