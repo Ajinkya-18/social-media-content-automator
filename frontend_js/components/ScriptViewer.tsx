@@ -38,10 +38,8 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
     if (selectedFile) {
       setLoading(true);
       
-      let url = '';
       if (fileSource === 'local') {
-        url = `/api/local/read?filename=${encodeURIComponent(selectedFile)}`;
-        fetch(url)
+        fetch(`/api/local/read?filename=${encodeURIComponent(selectedFile)}`)
           .then(res => res.json())
           .then(data => {
             const newContent = data.content || '';
@@ -59,9 +57,18 @@ export default function ScriptViewer({ onBack }: ScriptViewerProps) {
             })
             .then(res => res.json())
             .then(data => {
-                const newContent = data.content || '';
-                setContent(newContent);
-                if (editor) editor.commands.setContent(newContent);
+                if (data.isBinary) {
+                    // Handle Image
+                    const mime = data.mimeType || 'image/png';
+                    const imgContent = `<img src="data:${mime};base64,${data.content}" alt="${data.name}" class="max-w-full h-auto rounded-lg shadow-lg mx-auto" />`;
+                    setContent(imgContent);
+                    if (editor) editor.commands.setContent(imgContent);
+                } else {
+                    // Handle Text
+                    const newContent = data.content || '';
+                    setContent(newContent);
+                    if (editor) editor.commands.setContent(newContent);
+                }
                 setLoading(false);
             })
             .catch(err => { console.error(err); setLoading(false); });

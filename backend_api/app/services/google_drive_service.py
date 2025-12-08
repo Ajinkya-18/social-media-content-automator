@@ -136,7 +136,8 @@ async def read_file_from_drive(access_token: str, file_id: str):
     """
     Reads a file from Google Drive.
     If it's a Google Doc, exports it as text.
-    If it's a regular file, downloads the content.
+    If it's a regular file (text), downloads the content.
+    If it's an image, downloads and returns base64.
     """
     creds = get_creds(access_token)
     service = build('drive', 'v3', credentials=creds)
@@ -144,13 +145,20 @@ async def read_file_from_drive(access_token: str, file_id: str):
     # First get metadata to check mimeType
     file_metadata = service.files().get(fileId=file_id, fields="mimeType, name").execute()
     mime_type = file_metadata.get('mimeType')
+    name = file_metadata.get('name')
 
     if mime_type == 'application/vnd.google-apps.document':
         # Export Google Doc as plain text
         request = service.files().export_media(fileId=file_id, mimeType='text/plain')
+        is_binary = False
     else:
-        # Download regular file (e.g. text/markdown)
+        # Download regular file
         request = service.files().get_media(fileId=file_id)
+        # Check if it's an image
+        if mime_type and mime_type.startswith('image/'):
+            is_binary = True
+        else:
+            is_binary = False
 
     fh = io.BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
@@ -158,4 +166,51 @@ async def read_file_from_drive(access_token: str, file_id: str):
     while done is False:
         status, done = downloader.next_chunk()
 
-    return {"content": fh.getvalue().decode('utf-8'), "name": file_metadata.get('name')}
+    file_content = fh.getvalue()
+    
+    if is_binary:
+        # Return base64 for images
+        b64_content = base64.b64encode(file_content).decode('utf-8')
+        return {
+            "content": b64_content, 
+            "name": name, 
+            "mimeType": mime_type,
+            "isBinary": True
+        }
+    else:
+        # Return text
+        try:
+            text_content = file_content.decode('utf-8')
+        except UnicodeDecodeError:
+            # Fallback for non-utf8 text or actually binary files misidentified
+            text_content = str(file_content) 
+            
+        return {
+            "content": text_content, 
+            "name": name, 
+            "mimeType": mime_type,
+            "isBinary": False
+        }
+
+async def read_sheet_values(access_token: str, spreadsheet_id: str, range_name: str = None):
+    """
+    Reads values from a Google Sheet.
+    If range_name is None, attempts to read the first sheet.
+    """
+    creds = get_creds(access_token)
+    service = build('sheets', 'v4', credentials=creds)
+
+    # If no range provided, default to 'Sheet1' or first sheet
+    if not range_name:
+        spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        try:
+            sheet_title = spreadsheet['sheets'][0]['properties']['title']
+            range_name = f"'{sheet_title}'!A:E" # Read columns A to E (Date, Platform, Topic, Prompt, Status)
+        except (KeyError, IndexError):
+            range_name = 'Sheet1!A:E'
+
+    result = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=range_name).execute()
+    
+    rows = result.get('values', [])
+    return {"rows": rows}

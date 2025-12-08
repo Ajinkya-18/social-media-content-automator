@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.services.llm_engine import generate_script_stream
 from app.services.image_engine import generate_image
-from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet, create_drive_folder, read_file_from_drive
+from app.services.google_drive_service import list_drive_files, upload_file_to_drive, append_row_to_sheet, create_drive_folder, read_file_from_drive, read_sheet_values
 from google.auth.exceptions import RefreshError
 from app.utils import create_docx, create_markdown
 from fastapi.responses import StreamingResponse
@@ -205,6 +205,21 @@ async def append_sheet_endpoint(req: SheetAppendRequest, authorization: str = He
         return result
     except Exception as e:
         print(f"Sheet Append Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/google/sheet/read")
+async def read_sheet_endpoint(spreadsheetId: str, range: Optional[str] = None, authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or Missing Authorization header")
+    
+    token = authorization.split(" ")[1]
+    try:
+        result = await read_sheet_values(token, spreadsheetId, range)
+        return result
+    except RefreshError:
+        raise HTTPException(status_code=401, detail="Google Token Expired")
+    except Exception as e:
+        print(f"Sheet Read Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/download/script")

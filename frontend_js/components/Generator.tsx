@@ -374,6 +374,49 @@ export default function Generator() {
     }
   };
 
+  const [isSheetPickerOpen, setIsSheetPickerOpen] = useState(false);
+  const { googleSheetsEnabled } = useAppStore();
+
+  const handleImportFromSheet = () => {
+    setIsSheetPickerOpen(true);
+  };
+
+  const handleSheetSelect = async (sheetId: string, sheetName: string) => {
+    setIsSheetPickerOpen(false);
+    const token = (session as any)?.accessToken;
+    if (!token) return alert("Please sign in to Google Drive first.");
+
+    try {
+        const res = await fetch(`/api/python/google/sheet/read?spreadsheetId=${sheetId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            const rows = data.rows || [];
+            // Parse rows. Assumption: Matches ContentCalendar format
+            // [Date, Platform, Topic, Prompt, Status]
+            const parsedItems = rows.map((row: string[], index: number) => ({
+                id: `sheet-${index}`,
+                date: row[0],
+                platform: row[1]?.toLowerCase(),
+                topic: row[2],
+                prompt: row[3],
+                status: row[4]
+            })).filter((item: any) => item.topic); // Filter empty rows
+
+            setPlannerItems(parsedItems);
+            setShowImport(true);
+        } else {
+            console.error("Failed to read sheet");
+            alert("Failed to read Google Sheet.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error reading sheet.");
+    }
+  };
+
   return (
     <div className="max-w-[1400px] mx-auto h-[calc(100vh-100px)] flex flex-col relative p-6">
       {/* Session Expired Modal */}
@@ -412,13 +455,24 @@ export default function Generator() {
           </h1>
           <p className="text-gray-400 text-sm">Create optimized content for your social media channels.</p>
         </div>
-        <button 
-          onClick={fetchPlannerItems}
-          className="glass-button px-4 py-2 rounded-lg text-sm text-blue-300 hover:text-white flex items-center space-x-2"
-        >
-          <FileText size={16} />
-          <span>Import from Planner</span>
-        </button>
+        <div className="flex space-x-2">
+            <button 
+            onClick={fetchPlannerItems}
+            className="glass-button px-4 py-2 rounded-lg text-sm text-blue-300 hover:text-white flex items-center space-x-2"
+            >
+            <FileText size={16} />
+            <span>Local Plan</span>
+            </button>
+            {googleSheetsEnabled && (
+                <button 
+                onClick={handleImportFromSheet}
+                className="glass-button px-4 py-2 rounded-lg text-sm text-green-300 hover:text-white flex items-center space-x-2"
+                >
+                <FileText size={16} />
+                <span>Import Sheet</span>
+                </button>
+            )}
+        </div>
       </div>
 
       {/* Import Modal */}
@@ -741,13 +795,22 @@ export default function Generator() {
         </div>
       </div>
       
-      {/* Drive Picker Modal */}
+      {/* Drive Picker Modal - Docs */}
       <GoogleDrivePicker
         isOpen={isDrivePickerOpen}
         onClose={() => setIsDrivePickerOpen(false)}
         onSelect={handleDriveSelect}
         mode="pick-folder"
         title="Select Folder for Script"
+      />
+
+      {/* Drive Picker Modal - Sheets */}
+      <GoogleDrivePicker
+        isOpen={isSheetPickerOpen}
+        onClose={() => setIsSheetPickerOpen(false)}
+        onSelect={handleSheetSelect}
+        mode="pick-sheet"
+        title="Select Planner Sheet"
       />
     </div>
   );
