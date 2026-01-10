@@ -7,7 +7,8 @@ import {
   Loader2, PlayCircle, LogOut, Wand2, X, Check, Image as ImageIcon 
 } from "lucide-react";
 
-export default function DashboardPage() {
+// 1. Rename the main logic component to DashboardContent
+function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [videos, setVideos] = useState<any[]>([]);
@@ -297,4 +298,17 @@ function StatCard({ icon, label, value }: { icon: any, label: string, value: str
             </div>
         </div>
     )
+}
+
+// 2. Export the Wrapped Component as Default
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <Loader2 className="w-10 h-10 text-red-500 animate-spin"/>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
 }
