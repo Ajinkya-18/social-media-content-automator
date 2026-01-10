@@ -13,8 +13,7 @@ import base64
 import re
 from auth import router as auth_router
 from analytics import router as analytics_router
-import auth
-import webhooks
+from webhooks import router as webhooks_router
 
 
 load_dotenv()
@@ -27,9 +26,16 @@ client = Groq(
 
 app = FastAPI(title="AfterGlow - Studio")
 
+origins = [
+    "http://localhost:3000",  # Localhost testing
+    "http://127.0.0.1:3000",  # Localhost testing (alternative)
+    "https://social-media-content-automator.vercel.app",  # <--- YOUR VERCEL DOMAIN
+    # Add any custom domains if you have them
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +43,11 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(analytics_router)
+app.include_router(webhooks_router)
+
+@app.get("/")
+def read_root():
+    return {"status": "AfterGlow API is running"}
 
 class DriveScriptRequest(BaseModel):
     token: str
