@@ -114,7 +114,8 @@ async def callback_youtube(request: Request):
 
         supabase.table("social_tokens").upsert(data).execute()
 
-        return RedirectResponse(f"http://127.0.0.1:3000/dashboard?status=connected&email={user_email}")
+        frontend_url = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
+        return RedirectResponse(f"{frontend_url}/dashboard?status=connected&email={user_email}")
 
     except Exception as e:
         print(f"Auth Error: {e}")
@@ -200,7 +201,8 @@ async def callback_canva(request: Request):
 
         supabase.table("social_tokens").upsert(db_data).execute()
         
-        return RedirectResponse(f"http://127.0.0.1:3000/studio?status=connected&canva_id={canva_user_id}")
+        frontend_url = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
+        return RedirectResponse(f"{frontend_url}/studio?status=connected&canva_id={canva_user_id}")
 
     except Exception as e:
         print(f"Canva Auth Error: {e}")
