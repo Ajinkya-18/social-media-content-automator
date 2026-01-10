@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import stripe
-
+import razorpay
 
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
 
@@ -27,6 +27,8 @@ load_dotenv()
 router = APIRouter()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+razorpay_client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
 
 supabase: Client = create_client(
     os.getenv("SUPABASE_URL"),
@@ -719,4 +721,65 @@ async def get_user_credits(email: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class OrderRequest(BaseModel):
+    email: str
+    plan_type: str
 
+@router.post("/razorpay/create-order")
+async def create_razorpay_order(payload: OrderRequest):
+    try:
+        prices = {
+            "starter": 99900 # In Paisa: Rs.999 -> P99900
+            "pro": 149900 # In Paisa: Rs.1499 -> P149900
+            "credits_100": 49900 # In Paisa: Rs.499 -> P49900
+        }
+
+        amount = prices.get(payload.plan_type)
+
+        if not amount:
+            raise HTTPException(400, "Invalid plan type")
+
+        data = {
+            "amount": amount,
+            "currency": "INR",
+            "receipt": payload.email,
+            "notes": {
+                "plan_type": payload.plan_type,
+                "user_email": payload.email
+            }
+        }
+
+        order = razorpay_client.order.create(data=data)
+
+        supabase.table("profiles").upsert({
+            "user_email": payload.email,
+        }, on_conflict="user_email").execute()
+
+        return order
+    
+    except Exception as e:
+        print(f"Razorpay Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/user/credits")
+async def get_user_credits(email:str):
+    try:
+        res = supabase.table("profiles")\
+            .select("credits_balance, subscription_tier")\
+            .eq("user_email", email).execute()
+
+        if res.data:
+            return res.data[0]
+
+        else:
+            new_profile = {"user_email": email, "credits_balance": 50, "subscription_tier": "free"}
+            supabase.table("profiles")\
+                .insert(new_profile).execute()
+            
+            return new_profile
+        
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+        

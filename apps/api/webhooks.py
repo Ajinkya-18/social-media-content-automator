@@ -1,4 +1,7 @@
 import os
+import hmac
+import hashlib
+import json
 import stripe
 from fastapi import APIRouter, Request, HTTPException, Header
 from supabase import create_client, Client
@@ -15,6 +18,8 @@ supabase: Client = create_client(
     os.getenv("SUPABASE_URL"),
     os.getenv("SUPABASE_KEY")
 )
+
+secret = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
@@ -73,6 +78,75 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         
         print(f"Credits updated. New Balance: {current_balance + credits_to_add}")
 
+    return {"status": "success"}
+
+@ router.post("/razorpay/webhook")
+async def razorpay_webhook(request: Request):
+    signature = request.headers.get("X-Razorpay-Signature")
+    body = await request.body()
+
+    try: 
+        if not secret:
+            raise ValueError("RAZORPAY_WEBHOOK_SECRET is not set.")
+
+        generated_signature = hmac.new(
+            key=secret.encode('utf-8'),
+            msg=body,
+            digestmod=hashlib.sha256
+        ).hexdigest()
+
+        if generated_signature != signature:
+            raise HTTPException(400, "Invalid signature")
+
+    except Exception as e:
+        print(f"Webhook Signature Error: {e}")
+        raise HTTPException(400, "Signature verification failed")
+
+    event = json.loads(body)
+
+    if event['event'] == 'order.paid':
+        order_entity = event['payload']['order']['entity']
+
+        notes = order_entity.get('notes', {})
+        user_email = notes.get('user_email')
+        plan_type = notes.get('plan_type')
+
+        if not user_email:
+            print("Webhook Error: No email in notes")
+            return {"status": "ignored"}
+
+        print(f"Payment captured: {user_email} -> {plan_type}")
+
+        credits_to_add = 0
+        new_tier = None
+
+        if plan_type == 'credits_100':
+            credits_to_add = 100
+
+        elif plan_type == 'starter':
+            credits_to_add = 500
+            new_tier = 'starter'
+        
+        elif plan_type == 'pro':
+            credits_to_add = 1500
+            new_tier = 'pro'
+        
+        res = supabase.table("profiles")\
+            .select("credits_balance").eq("user_email", user_email)\
+            .execute()
+        
+        current_balance = res.data[0]['credits_balance'] if res.data else 0
+
+        update_data = {"credits_balance": current_balance + credits_to_add}
+
+        if new_tier:
+            update_data['subscription_tier'] = new_tier
+        
+        supabase.table("profiles").update(update_data)\
+            .eq("user_email", user_email).execute()
+        
+        print(f"Credits updated. New Balance: {current_balance + credits_to_add}")
+    
     return {"status": "success"}
 
 
