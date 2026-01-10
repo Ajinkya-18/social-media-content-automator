@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { 
   Palette, ExternalLink, Layout, PlusCircle, Link as LinkIcon, 
-  Loader2, Presentation, FileText, Instagram, LogOut // <--- Added LogOut
+  Loader2, Presentation, FileText, Instagram, LogOut 
 } from "lucide-react";
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function StudioPage() {
+// 1. Rename the logic component to StudioContent
+function StudioContent() {
   const [isConnected, setIsConnected] = useState(false);
   const [canvaId, setCanvaId] = useState<string | null>(null);
   const [designs, setDesigns] = useState<any[]>([]);
@@ -104,18 +105,14 @@ export default function StudioPage() {
     }
   };
 
-  // --- 4. NEW LOGOUT HANDLER ---
+  // --- 4. LOGOUT HANDLER ---
   const handleLogout = () => {
     if (confirm("Are you sure you want to disconnect your Canva account?")) {
-        // Clear local storage
         localStorage.removeItem('canva_connected');
         localStorage.removeItem('canva_id');
-        
-        // Reset State
         setIsConnected(false);
         setCanvaId(null);
         setDesigns([]);
-        
         router.refresh();
     }
   };
@@ -123,7 +120,7 @@ export default function StudioPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       
-      {/* Header - Updated with Logout Button */}
+      {/* Header */}
       <div className="border-b border-white/5 pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -144,7 +141,6 @@ export default function StudioPage() {
                   <span className="block text-sm text-white font-medium leading-tight">Canva Account</span>
               </div>
               <div className="relative">
-                  {/* Generic Avatar since Canva API auth doesn't return a photo URL in this flow */}
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center border-2 border-white/10 group-hover:border-red-500 transition-colors shadow-lg">
                         <span className="font-bold text-white text-sm">CA</span>
                   </div>
@@ -227,14 +223,10 @@ export default function StudioPage() {
                 </div>
                 <h4 className="text-2xl font-bold text-white">Connect Canva</h4>
                 <p className="text-slate-500 mt-2 text-sm">Grant permission to access designs</p>
-                
-                {/* Decorative background glow */}
                 <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl group-hover:bg-orange-500/30 transition-colors pointer-events-none" />
               </button>
             ) : (
               <div className="w-full max-w-md space-y-4">
-                 
-                 {/* 1. Presentation Button */}
                  <button
                    disabled={!!creating}
                    onClick={() => handleCreate('presentation')}
@@ -247,11 +239,9 @@ export default function StudioPage() {
                         <span className="block text-lg font-bold text-white">New Presentation</span>
                         <span className="text-xs text-slate-400">16:9 Format • Slides</span>
                     </div>
-                    {/* Hover Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 to-orange-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
                  </button>
 
-                 {/* 2. Social Post Button */}
                  <button
                    disabled={!!creating}
                    onClick={() => handleCreate('social')}
@@ -267,7 +257,6 @@ export default function StudioPage() {
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 to-purple-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
                  </button>
 
-                 {/* 3. Doc Button */}
                  <button
                    disabled={!!creating}
                    onClick={() => handleCreate('doc')}
@@ -283,7 +272,6 @@ export default function StudioPage() {
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-blue-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
                  </button>
                  
-                 {/* Status Footer */}
                  <div className="mt-4 text-center">
                     <span className="text-xs text-slate-600 flex items-center justify-center gap-2">
                         <Layout className="w-3 h-3" />
@@ -295,5 +283,18 @@ export default function StudioPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// 2. Export the Wrapped Component
+export default function StudioPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <Loader2 className="w-10 h-10 text-orange-500 animate-spin"/>
+      </div>
+    }>
+      <StudioContent />
+    </Suspense>
   );
 }
