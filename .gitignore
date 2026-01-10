@@ -1,66 +1,40 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-frontend_js/node_modules/*
-**/node_modules
-**/.pnp
-.pnp.js
-**/.next/
-**/out/
-**/build/
-**/pycache
-**/*.pyc
-**/venv
-**/.env
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-frontend_js/.next/*
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
+# --- SECRETS & ENVIRONMENT (The Most Important Part) ---
+.env
+.env.local
+.env.*.local
+*.env
 *.pem
 
-# debug
+# --- NEXT.JS / WEB (Frontend) ---
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/build/
+apps/web/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# --- PYTHON / API (Backend) ---
+apps/api/__pycache__/
+apps/api/venv/
+apps/api/.venv/
+apps/api/env/
+*.py[cod]
+*$py.class
+apps/api/studio-flowstate/
 
-# vercel
-.vercel
+# --- IDE & SYSTEM FILES (Noise) ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-.env
-.png
-.jpg
-.jpeg
-.gif
-OAuthClientIDs-creds.json
-credentials.json
-token.json
-*.ps1
-.env
-**/.env.local
-**/.env.development.local
-**/.env.test.local
-**/.env.production.local
+# --- USER ASSETS (Optional but Recommended) ---
+# If users generate images, you don't want them in git history
+*.png
+*.jpg
+*.jpeg
+*.pdf
+# Keep .gitkeep if you need empty folders, otherwise ignore the folder content
