@@ -14,6 +14,7 @@ import re
 from auth import router as auth_router
 from analytics import router as analytics_router
 from webhooks import router as webhooks_router
+from video import router as video_router
 
 
 load_dotenv()
@@ -44,6 +45,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(analytics_router)
 app.include_router(webhooks_router)
+app.include_router(video_router)
 
 @app.get("/")
 def read_root():
