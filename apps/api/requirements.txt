@@ -65,6 +65,7 @@ python-docx==1.2.0
 python-dotenv==1.2.1
 python-multipart==0.0.21
 PyYAML==6.0.3
+razorpay==2.0.0
 realtime==2.27.0
 replicate==1.0.7
 requests==2.32.5
