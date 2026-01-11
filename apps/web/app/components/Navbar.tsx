@@ -20,7 +20,7 @@ export default function Navbar() {
       {/* Navigation Links */}
       <div className="flex items-center space-x-8">
         
-        <NavLink href="/" active={pathname === "/"}>Home</NavLink>
+        {/* <NavLink href="/" active={pathname === "/"}>Home</NavLink> */}
         
         {isSignedIn && (
           <>
