@@ -39,7 +39,7 @@ async def generate_video(payload: VideoRequest):
         print(f"Generating video for {payload.email} ({tier} tier)...")
 
         output = replicate.run(
-            "cerspense/zeroscope_v2_576w:9f747673056b9c949518d5ebb7e891eb23395c819e3fe00805181e4b5340f16f",
+            "cerspense/zeroscope_v2_576w:0e3a503692e76a666070622340b037704256247c40c4270d10d11978255c250e",
             input={
                 "prompt": payload.prompt,
                 "num_frames": num_frames,
