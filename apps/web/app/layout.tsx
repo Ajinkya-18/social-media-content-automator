@@ -4,7 +4,8 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import Navbar from "./components/Navbar";
-import Footer from "./components/Footer"; 
+import Footer from "./components/Footer";
+import Providers from "./providers"; // <--- Import the new wrapper
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,19 +29,17 @@ export default function RootLayout({
       <html lang="en">
         <body className={`${inter.className} bg-[#030712] text-white flex flex-col min-h-screen`}>
           
-          {/* 1. Navbar (Fixed at Top) */}
-          <Navbar />
+          {/* Wrap everything inside the body with your new Providers */}
+          <Providers>
+            <Navbar />
 
-          {/* 2. Main Content 
-              Added pt-28 to push content down so Navbar doesn't cover it 
-          */}
-          <main className="flex-1 pt-28 pb-10">
-            {children}
-          </main>
+            <main className="flex-1 pt-28 pb-10">
+              {children}
+            </main>
 
-          {/* 3. Footer (Always at Bottom) */}
-          <Footer />
-          
+            <Footer />
+          </Providers>
+
         </body>
       </html>
     </ClerkProvider>
