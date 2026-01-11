@@ -38,7 +38,8 @@ async def generate_video(payload: VideoRequest):
 
         print(f"Generating video for {payload.email} ({tier} tier)...")
 
-        model = replicate.models.get("cerspense/zeroscope_v2_576w")
+        # model = replicate.models.get("cerspense/zeroscope_v2_576w")
+        model = replicate.models.get("anotherjesse/zeroscope-v2-xl")
         latest_version = model.versions.list()[0]
 
         output = latest_version.predict(
