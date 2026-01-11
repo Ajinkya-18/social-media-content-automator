@@ -25,7 +25,10 @@ export default function Navbar() {
         {isSignedIn && (
           <>
             <NavLink href="/dashboard" active={pathname === "/dashboard"}>Dashboard</NavLink>
-            <NavLink href="/studio" active={pathname === "/studio"}>Studio</NavLink>
+            <NavLink href="/studio" active={pathname === "/studio"}>Designer</NavLink>
+            <NavLink href="/repurposer" active={pathname === "/repurposer"}>Repurposer</NavLink>
+            <NavLink href="/visualizer" active={pathname === "/visualizer"}>Visualizer</NavLink>
+            <NavLink href="/writer" active={pathname === "/writer"}>Writer</NavLink>
             <NavLink href="/scheduler" active={pathname === "/scheduler"}>Scheduler</NavLink>
             <NavLink href="/pricing" active={pathname === "/pricing"}>Pricing</NavLink>
           </>
