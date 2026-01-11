@@ -21,8 +21,8 @@ export default function Sidebar() {
     { name: "Writer", icon: PenTool, path: "/writer", active: true },
     { name: "Visualizer", icon: Eye, path: "/visualizer", active: true },
     { name: "Repurposer", icon: Layers, path: "/repurposer", active: true },
-    { name: "Designer", icon: Palette, path: "/studio", active: true },   // Coming Soon
-    { name: "Video Suite", icon: Video, path: "/video", active: false },        // Coming Soon
+    { name: "Designer", icon: Palette, path: "/studio", active: true },   
+    { name: "Video Suite", icon: Video, path: "/video", active: true },  
   ];
 
   return (
