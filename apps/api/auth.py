@@ -781,5 +781,126 @@ async def get_user_credits(email:str):
     except Exception as e:
         raise HTTPException(500, str(e))
 
+@router.get("/auth/instagram/login")
+async def login_instagram():
+    client_id = os.getenv("INSTAGRAM_CLIENT_ID")
+    redirect_uri = os.getenv("INSTAGRAM_REDIRECT_URI")
 
+    state = secrets.token_urlsafe(16)
+
+    scope = "instagram_basic,pages_show_list,pages_read_engagement"
+
+    auth_url = (
+        f"https://www.facebook.com/v18.0/dialog/oauth?"
+        f"client_id={client_id}&"
+        f"redirect_uri={redirect_uri}&"
+        f"state={state}&"
+        f"scope={scope}"
+    )
+    
+    return RedirectResponse(auth_url)
+
+@router.get("/auth/instagram/callback")
+async def callback_instagram(request: Request):
+    code = request.query_params.get("code")
+
+    if not code:
+        raise HTTPException(400, "Authorization code missing")
+
+    try:
+        client_id = os.getenv("INSTAGRAM_CLIENT_ID")
+        client_secret = os.getenv("INSTAGRAM_CLIENT_SECRET")
+        redirect_uri = os.getenv("INSTAGRAM_REDIRECT_URI")
+
+        token_url = (
+            f"https://graph.facebook.com/v18.0/oauth/access_token?"
+            f"client_id={client_id}&"
+            f"redirect_uri={redirect_uri}&"
+            f"client_secret={client_secret}&"
+            f"code={code}"
+        )
+
+        token_res = requests.get(token_url).json()
+
+        if "access_token" not in token_res:
+            raise HTTPException(400, f"Token exchange failed: {token_res}")
         
+        access_token = token_res["access_token"]
+
+        pages_url = f"https://graph.facebook.com/v18.0/me/accounts?access_token={access_token}"
+        pages_res = requests.get(pages_url).json()
+
+        ig_user_id = None
+
+        if "data" in pages_res:
+            for page in pages_res["data"]:
+                page_id = page["id"]
+                ig_req = requests.get(
+                    f"https://graph.facebook.com/v18.0/{page_id}?fields=instagram_business_account&access_token={access_token}"
+                ).json()
+
+                if "instagram_business_account" in ig_req:
+                    ig_user_id = ig_req["instagram_business_account"]["id"]
+                    break
+
+        if not ig_user_id:
+            return RedirectResponse(
+                f"{os.getenv('FRONTEND_URL')}/dashboard?error=no_instagram_business_account"
+            )
+
+        db_data = {
+            "user_email": f"instagram_{ig_user_id}",
+            "provider": "instagram",
+            "access_token": access_token,
+            "refresh_token": None,
+            "updated_at": "now()"
+        }
+
+        supabase.table("social_tokens").upsert(db_data).execute()
+
+        return RedirectResponse(
+            f"{os.getenv('FRONTEND_URL')}/dashboard?status=connected&instagram_id={ig_user_id}"
+        )
+
+
+    except Exception as e:
+        print(f"Instagram Auth Error: {e}")
+        raise HTTPException(500, str(e))
+
+@router.get("/instagram/stats")
+async def get_instagram_stats(instagram_id: str):
+    try:
+        response = supabase.table("social_tokens")\
+            .select("access_token")\
+            .eq("user_email", f"instagram_{instagram_id}")\
+            .eq("provider", "instagram")\
+            .execute()
+
+        if not response.data:
+            raise HTTPException(401, "Instagram not connected")
+
+        access_token = response.data[0]['access_token']
+
+        url = (
+            f"https://graph.facebook.com/v18.0/{instagram_id}?"
+            f"fields=username,followers_count,media_count,profile_picture_url&"
+            f"access_token={access_token}"
+        )
+
+        stats_res = requests.get(url).json()
+
+        if "error" in stats_res:
+            raise HTTPException(400, stats_res["error"]["message"])
+
+        return {
+            "username": stats_res.get("username"),
+            "followers": stats_res.get("followers_count"),
+            "posts": stats_res.get("media_count"),
+            "profile_pic": stats_res.get("profile_picture_url")
+        }
+
+    except Exception as e:
+        print(f"IG Stats Error: {e}")
+        raise HTTPException(500, str(e))
+
+

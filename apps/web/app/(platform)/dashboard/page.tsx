@@ -4,10 +4,10 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Users, Eye, Video, Activity, ExternalLink, 
-  Loader2, PlayCircle, LogOut, Wand2, X, Check, Image as ImageIcon 
+  Loader2, LogOut, Wand2, X, Image as ImageIcon, 
+  Instagram 
 } from "lucide-react";
 
-// 1. Rename the main logic component to DashboardContent
 function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -21,9 +21,53 @@ function DashboardContent() {
   const [loadingDesigns, setLoadingDesigns] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // --- INSTAGRAM STATE ---
+  const [instaStats, setInstaStats] = useState<any>(null);
+  const [instaId, setInstaId] = useState<string | null>(null);
+
   const searchParams = useSearchParams();
   const router = useRouter();
+  
+  // Define API URL globally for component consistency
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
+  // 1. INSTAGRAM AUTH CHECK
+  useEffect(() => {
+    const urlInstaId = searchParams.get('instagram_id');
+    if (urlInstaId) {
+        setInstaId(urlInstaId);
+        localStorage.setItem('insta_id', urlInstaId);
+        router.replace('/dashboard');
+    } else {
+        const stored = localStorage.getItem('insta_id');
+        if (stored) setInstaId(stored);
+    }
+  }, [searchParams, router]);
+
+  // 2. FETCH INSTAGRAM STATS
+  useEffect(() => {
+    if (instaId) fetchInstaStats();
+  }, [instaId]);
+
+  const fetchInstaStats = async () => {
+    try {
+        // FIX: Use the safe apiUrl with fallback
+        const res = await fetch(`${apiUrl}/instagram/stats?instagram_id=${instaId}`);
+        if (res.ok) {
+            setInstaStats(await res.json());
+        }
+    } catch (e) {
+        console.error("IG Fetch Error", e);
+    }
+  };
+
+  const handleInstaDisconnect = () => {
+      localStorage.removeItem('insta_id');
+      setInstaStats(null);
+      setInstaId(null);
+  };
+
+  // 3. YOUTUBE AUTH CHECK
   useEffect(() => {
     const urlEmail = searchParams.get('email');
     if (urlEmail) {
@@ -37,6 +81,7 @@ function DashboardContent() {
     }
   }, [searchParams, router]);
 
+  // 4. FETCH YOUTUBE DATA
   useEffect(() => {
     if (email) fetchData();
   }, [email]);
@@ -44,7 +89,6 @@ function DashboardContent() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
       const [statsRes, videosRes] = await Promise.all([
         fetch(`${apiUrl}/youtube/stats?email=${email}`),
         fetch(`${apiUrl}/youtube/videos?email=${email}`)
@@ -73,7 +117,6 @@ function DashboardContent() {
     setSelectedVideo(videoId);
     setPickerOpen(true);
     
-    // Fetch Canva designs fresh to ensure we have the latest
     const canvaId = localStorage.getItem('canva_id');
     if (!canvaId) {
         alert("Please connect Canva in the Studio tab first.");
@@ -84,7 +127,7 @@ function DashboardContent() {
     if (canvaDesigns.length === 0) {
         setLoadingDesigns(true);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/canva/designs?canva_id=${canvaId}`);
+            const res = await fetch(`${apiUrl}/canva/designs?canva_id=${canvaId}`);
             const data = await res.json();
             if (data.items) setCanvaDesigns(data.items);
         } catch (e) {
@@ -102,7 +145,7 @@ function DashboardContent() {
     setProcessingId(designId);
 
     try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/bridge/thumbnail`, {
+        const res = await fetch(`${apiUrl}/bridge/thumbnail`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -130,13 +173,12 @@ function DashboardContent() {
     }
   };
 
-
   if (!email) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-in fade-in duration-500">
         <h2 className="text-2xl font-bold text-white">Connect YouTube</h2>
         <button
-            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/auth/youtube/login`}
+            onClick={() => window.location.href = `${apiUrl}/auth/youtube/login`}
             className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all flex items-center gap-2"
         >
             <Video className="w-5 h-5" /> Connect Channel
@@ -158,7 +200,6 @@ function DashboardContent() {
           <p className="text-slate-400 mt-1">Live analytics from {stats?.channel_name || 'YouTube'}</p>
         </div>
         
-        {/* FIX: Show logout button if email exists, even if stats failed to load */}
         {email && (
            stats ? (
              <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full hover:bg-red-900/20 transition-colors group">
@@ -202,7 +243,6 @@ function DashboardContent() {
                             <p className="text-slate-400 text-xs mt-1">Published: {new Date(video.published_at).toLocaleDateString()}</p>
                         </div>
                         
-                        {/* --- BRIDGE BUTTON --- */}
                         <button 
                             onClick={() => openThumbnailPicker(video.id)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white rounded-lg transition-all text-xs font-bold border border-orange-500/20"
@@ -218,11 +258,58 @@ function DashboardContent() {
         </>
       )}
 
+      {/* --- INSTAGRAM SECTION --- */}
+      <div className="mt-12 border-t border-white/5 pt-8">
+          <div className="flex justify-between items-end mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <Instagram className="text-pink-500 w-8 h-8" />
+                    Instagram Analytics
+                </h3>
+                <p className="text-slate-400 mt-1">
+                    {instaStats ? `Stats for @${instaStats.username}` : 'Connect your Business Account'}
+                </p>
+              </div>
+
+              {!instaId ? (
+                  <button
+                    onClick={() => window.location.href = `${apiUrl}/auth/instagram/login`}
+                    className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-bold transition-all flex items-center gap-2"
+                  >
+                      <Instagram className="w-5 h-5" /> Connect Instagram
+                  </button>
+              ) : (
+                  <button onClick={handleInstaDisconnect} className="text-sm text-slate-500 hover:text-white underline">
+                      Disconnect
+                  </button>
+              )}
+          </div>
+
+          {instaStats && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
+                <StatCard 
+                    icon={<Users className="text-pink-400" />} 
+                    label="Followers" 
+                    value={instaStats.followers.toLocaleString()} 
+                />
+                <StatCard 
+                    icon={<ImageIcon className="text-purple-400" />} 
+                    label="Total Posts" 
+                    value={instaStats.posts.toLocaleString()} 
+                />
+                <StatCard 
+                    icon={<Activity className="text-orange-400" />} 
+                    label="Account Status" 
+                    value="Active" 
+                />
+            </div>
+          )}
+      </div>
+
       {/* --- THUMBNAIL PICKER MODAL --- */}
       {pickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
-                {/* Modal Header */}
                 <div className="p-6 border-b border-white/5 flex justify-between items-center">
                     <div>
                         <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -235,7 +322,6 @@ function DashboardContent() {
                     </button>
                 </div>
 
-                {/* Modal Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                     {loadingDesigns ? (
                         <div className="flex flex-col items-center justify-center py-12 space-y-4">
@@ -261,18 +347,15 @@ function DashboardContent() {
                                         <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-slate-600" /></div>
                                     )}
                                     
-                                    {/* Overlay */}
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                                        <span className="text-white text-xs font-bold truncate">{design.title}</span>
-                                    </div>
-
-                                    {/* Processing State */}
                                     {processingId === design.id && (
                                         <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2">
                                             <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
                                             <span className="text-xs text-orange-400 font-bold">Uploading...</span>
                                         </div>
                                     )}
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                                        <span className="text-white text-xs font-bold truncate">{design.title}</span>
+                                    </div>
                                 </button>
                             ))}
                         </div>
@@ -300,7 +383,6 @@ function StatCard({ icon, label, value }: { icon: any, label: string, value: str
     )
 }
 
-// 2. Export the Wrapped Component as Default
 export default function DashboardPage() {
   return (
     <Suspense fallback={
