@@ -5,13 +5,13 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import Providers from "./providers"; // <--- Import the new wrapper
+import Providers from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AfterGlow | AI Content Engine",
-  description: "Canva to YouTube Automation Platform",
+  title: "AfterGlow v2 | Creator OS",
+  description: "The Operating System for the Creator Economy",
 };
 
 export default function RootLayout({
@@ -23,17 +23,21 @@ export default function RootLayout({
     <ClerkProvider
       appearance={{
         baseTheme: dark,
-        variables: { colorPrimary: "#0ea5e9" }, // Cyan-500
+        variables: { 
+          colorPrimary: "#f97316", // Orange-500 (The new primary)
+          colorBackground: "#0f172a", 
+        },
       }}
     >
       <html lang="en">
-        <body className={`${inter.className} bg-[#030712] text-white flex flex-col min-h-screen`}>
+        <body className={`${inter.className} bg-[#030712] text-white flex flex-col min-h-screen selection:bg-orange-500/30 selection:text-orange-200`}>
           
-          {/* Wrap everything inside the body with your new Providers */}
           <Providers>
+            {/* Fixed Navbar with Z-Index */}
             <Navbar />
 
-            <main className="flex-1 pt-28 pb-10">
+            {/* Main Content with padding for fixed nav */}
+            <main className="flex-1 pt-24 pb-12 relative z-10">
               {children}
             </main>
 

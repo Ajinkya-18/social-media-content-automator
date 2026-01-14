@@ -28,7 +28,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // Define API URL globally for component consistency
+  // Define API URL globally
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
   // 1. INSTAGRAM AUTH CHECK
@@ -51,7 +51,6 @@ function DashboardContent() {
 
   const fetchInstaStats = async () => {
     try {
-        // FIX: Use the safe apiUrl with fallback
         const res = await fetch(`${apiUrl}/instagram/stats?instagram_id=${instaId}`);
         if (res.ok) {
             setInstaStats(await res.json());
@@ -179,9 +178,9 @@ function DashboardContent() {
         <h2 className="text-2xl font-bold text-white">Connect YouTube</h2>
         <button
             onClick={() => window.location.href = `${apiUrl}/auth/youtube/login`}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all flex items-center gap-2"
+            className="px-8 py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-full font-bold transition-all flex items-center gap-2 shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:scale-105"
         >
-            <Video className="w-5 h-5" /> Connect Channel
+            <Video className="w-5 h-5" /> Sync Channel
         </button>
       </div>
     );
@@ -194,7 +193,7 @@ function DashboardContent() {
       <div className="border-b border-white/5 pb-6 flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            <LayoutDashboard className="text-red-500 w-8 h-8" />
+            <LayoutDashboard className="text-cyan-400 w-8 h-8" />
             Command Center
           </h2>
           <p className="text-slate-400 mt-1">Live analytics from {stats?.channel_name || 'YouTube'}</p>
@@ -202,10 +201,10 @@ function DashboardContent() {
         
         {email && (
            stats ? (
-             <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full hover:bg-red-900/20 transition-colors group">
-                <span className="text-sm font-medium text-white group-hover:text-red-400">{stats.channel_name}</span>
-                <img src={stats.thumbnail} alt="Channel" className="w-8 h-8 rounded-full" />
-                <LogOut className="w-4 h-4 text-slate-500 group-hover:text-red-500" />
+             <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full hover:bg-orange-500/10 transition-colors group border border-white/5 hover:border-orange-500/30">
+                <span className="text-sm font-medium text-white group-hover:text-orange-400 transition-colors">{stats.channel_name}</span>
+                <img src={stats.thumbnail} alt="Channel" className="w-8 h-8 rounded-full ring-2 ring-transparent group-hover:ring-orange-500/50 transition-all" />
+                <LogOut className="w-4 h-4 text-slate-500 group-hover:text-orange-500 transition-colors" />
              </button>
            ) : (
              <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors">
@@ -217,14 +216,14 @@ function DashboardContent() {
       </div>
 
       {loading && !stats ? (
-         <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-red-500 animate-spin"/></div>
+         <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-500 animate-spin"/></div>
       ) : (
         <>
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <StatCard icon={<Users className="text-blue-400" />} label="Subscribers" value={parseInt(stats?.subscribers || '0').toLocaleString()} />
-            <StatCard icon={<Eye className="text-green-400" />} label="Total Views" value={parseInt(stats?.views || '0').toLocaleString()} />
-            <StatCard icon={<Video className="text-red-400" />} label="Total Videos" value={stats?.video_count || '0'} />
+            <StatCard icon={<Users className="text-cyan-400" />} label="Subscribers" value={parseInt(stats?.subscribers || '0').toLocaleString()} />
+            <StatCard icon={<Eye className="text-blue-400" />} label="Total Views" value={parseInt(stats?.views || '0').toLocaleString()} />
+            <StatCard icon={<Video className="text-orange-400" />} label="Total Videos" value={stats?.video_count || '0'} />
           </div>
 
           {/* Recent Videos List */}
@@ -234,23 +233,25 @@ function DashboardContent() {
             </h3>
             <div className="space-y-4">
                 {videos.map((video) => (
-                    <div key={video.id} className="flex gap-4 items-center p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
-                        <div className="relative w-40 aspect-video rounded-lg overflow-hidden bg-slate-800">
+                    <div key={video.id} className="flex flex-col sm:flex-row gap-4 items-start sm:items-center p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group border border-transparent hover:border-white/5">
+                        <div className="relative w-40 aspect-video rounded-lg overflow-hidden bg-slate-800 shadow-lg">
                             <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h4 className="text-white font-medium truncate text-lg">{video.title}</h4>
+                            <h4 className="text-white font-medium truncate text-lg group-hover:text-cyan-400 transition-colors">{video.title}</h4>
                             <p className="text-slate-400 text-xs mt-1">Published: {new Date(video.published_at).toLocaleDateString()}</p>
                         </div>
                         
-                        <button 
-                            onClick={() => openThumbnailPicker(video.id)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white rounded-lg transition-all text-xs font-bold border border-orange-500/20"
-                        >
-                            <Wand2 className="w-3 h-3" /> Update Thumbnail
-                        </button>
-                        
-                        <a href={`https://youtu.be/${video.id}`} target="_blank" className="p-2 text-slate-400 hover:text-white"><ExternalLink className="w-5 h-5" /></a>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => openThumbnailPicker(video.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white rounded-lg transition-all text-xs font-bold border border-orange-500/20"
+                            >
+                                <Wand2 className="w-3 h-3" /> Update Thumbnail
+                            </button>
+                            
+                            <a href={`https://youtu.be/${video.id}`} target="_blank" className="p-2 text-slate-500 hover:text-white transition-colors" rel="noreferrer"><ExternalLink className="w-4 h-4" /></a>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -263,7 +264,7 @@ function DashboardContent() {
           <div className="flex justify-between items-end mb-6">
               <div>
                 <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-                    <Instagram className="text-pink-500 w-8 h-8" />
+                    <Instagram className="text-purple-400 w-8 h-8" />
                     Instagram Analytics
                 </h3>
                 <p className="text-slate-400 mt-1">
@@ -274,12 +275,12 @@ function DashboardContent() {
               {!instaId ? (
                   <button
                     onClick={() => window.location.href = `${apiUrl}/auth/instagram/login`}
-                    className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-bold transition-all flex items-center gap-2"
+                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white rounded-lg font-bold transition-all flex items-center gap-2 shadow-lg shadow-purple-900/20"
                   >
                       <Instagram className="w-5 h-5" /> Connect Instagram
                   </button>
               ) : (
-                  <button onClick={handleInstaDisconnect} className="text-sm text-slate-500 hover:text-white underline">
+                  <button onClick={handleInstaDisconnect} className="text-sm text-slate-500 hover:text-white underline decoration-slate-700 underline-offset-4">
                       Disconnect
                   </button>
               )}
@@ -288,17 +289,17 @@ function DashboardContent() {
           {instaStats && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
                 <StatCard 
-                    icon={<Users className="text-pink-400" />} 
+                    icon={<Users className="text-purple-400" />} 
                     label="Followers" 
                     value={instaStats.followers.toLocaleString()} 
                 />
                 <StatCard 
-                    icon={<ImageIcon className="text-purple-400" />} 
+                    icon={<ImageIcon className="text-cyan-400" />} 
                     label="Total Posts" 
                     value={instaStats.posts.toLocaleString()} 
                 />
                 <StatCard 
-                    icon={<Activity className="text-orange-400" />} 
+                    icon={<Activity className="text-green-400" />} 
                     label="Account Status" 
                     value="Active" 
                 />
@@ -308,9 +309,9 @@ function DashboardContent() {
 
       {/* --- THUMBNAIL PICKER MODAL --- */}
       {pickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-[#0b1121] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl shadow-black/50">
+                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
                     <div>
                         <h3 className="text-xl font-bold text-white flex items-center gap-2">
                             <ImageIcon className="text-orange-400 w-5 h-5" /> Select Canva Design
@@ -322,14 +323,14 @@ function DashboardContent() {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-6 bg-[#030712]">
                     {loadingDesigns ? (
-                        <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                            <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
-                            <p className="text-slate-500">Fetching designs from Canva...</p>
+                        <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                            <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+                            <p className="text-slate-500 font-mono text-sm">Fetching designs from Canva...</p>
                         </div>
                     ) : canvaDesigns.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
+                        <div className="text-center py-20 text-slate-500">
                             <p>No designs found. Create one in the Studio first!</p>
                         </div>
                     ) : (
@@ -339,22 +340,23 @@ function DashboardContent() {
                                     key={design.id}
                                     disabled={!!processingId}
                                     onClick={() => applyThumbnail(design.id)}
-                                    className="group relative aspect-video bg-slate-800 rounded-lg overflow-hidden border border-white/5 hover:border-orange-500 transition-all text-left"
+                                    className="group relative aspect-video bg-slate-800 rounded-lg overflow-hidden border border-white/5 hover:border-orange-500 transition-all text-left shadow-lg"
                                 >
                                     {design.thumbnail?.url ? (
-                                        <img src={design.thumbnail.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        <img src={design.thumbnail.url} alt={design.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-slate-600" /></div>
                                     )}
                                     
                                     {processingId === design.id && (
-                                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2">
-                                            <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
-                                            <span className="text-xs text-orange-400 font-bold">Uploading...</span>
+                                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
+                                            <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+                                            <span className="text-xs text-orange-400 font-bold tracking-widest">UPLOADING...</span>
                                         </div>
                                     )}
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                                        <span className="text-white text-xs font-bold truncate">{design.title}</span>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                                        <span className="text-white text-sm font-bold truncate">{design.title}</span>
+                                        <span className="text-orange-400 text-xs mt-1">Click to Apply</span>
                                     </div>
                                 </button>
                             ))}
@@ -371,13 +373,13 @@ function DashboardContent() {
 
 function StatCard({ icon, label, value }: { icon: any, label: string, value: string }) {
     return (
-        <div className="glass-panel p-6 rounded-xl border border-white/5 flex items-center gap-4 hover:border-white/10 transition-colors">
-            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+        <div className="glass-panel p-6 rounded-xl border border-white/5 flex items-center gap-5 hover:border-white/10 hover:bg-white/5 transition-all group">
+            <div className="w-14 h-14 rounded-full bg-white/5 border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 {icon}
             </div>
             <div>
-                <p className="text-slate-400 text-sm font-medium">{label}</p>
-                <h4 className="text-2xl font-bold text-white">{value}</h4>
+                <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</p>
+                <h4 className="text-3xl font-bold text-white mt-1 group-hover:text-cyan-100 transition-colors">{value}</h4>
             </div>
         </div>
     )
@@ -387,7 +389,7 @@ export default function DashboardPage() {
   return (
     <Suspense fallback={
       <div className="flex justify-center items-center min-h-screen bg-black">
-        <Loader2 className="w-10 h-10 text-red-500 animate-spin"/>
+        <Loader2 className="w-10 h-10 text-orange-500 animate-spin"/>
       </div>
     }>
       <DashboardContent />

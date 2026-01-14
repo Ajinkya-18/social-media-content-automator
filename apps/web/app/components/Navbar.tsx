@@ -2,65 +2,68 @@
 import Link from "next/link";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
+import { Sparkles } from "lucide-react";
 
 export default function Navbar() {
   const { isLoaded, isSignedIn } = useUser();
   const pathname = usePathname();
 
   return (
-    <nav className="fixed top-0 w-full z-50 flex items-center justify-between px-6 py-4 bg-[#030712]/80 backdrop-blur-md text-white border-b border-white/10">
+    <nav className="fixed top-0 w-full z-50 px-6 py-4 bg-[#030712]/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between transition-all duration-300">
       
-      {/* Brand Name */}
-      <div className="text-xl font-bold tracking-tight">
-        <Link href="/" className="hover:text-cyan-400 transition-colors bg-gradient-to-r from-cyan-400 to-blue-600 text-transparent bg-clip-text">
-          AfterGlow
+      {/* Brand: Fire & Ice Gradient */}
+      <div className="flex items-center gap-2">
+        <Link href="/" className="text-2xl font-bold tracking-tight group">
+          <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-transparent bg-clip-text group-hover:to-orange-500 transition-all duration-500">
+            AfterGlow
+          </span>
+          <span className="text-xs text-orange-500 font-mono ml-1 align-top">v2</span>
         </Link>
       </div>
 
       {/* Navigation Links */}
-      <div className="flex items-center space-x-8">
-        
-        {/* <NavLink href="/" active={pathname === "/"}>Home</NavLink> */}
-        
+      <div className="hidden md:flex items-center space-x-8">
         {isSignedIn && (
           <>
-            <NavLink href="/dashboard" active={pathname === "/dashboard"}>Dashboard</NavLink>
-            <NavLink href="/studio" active={pathname === "/studio"}>Designer</NavLink>
-            <NavLink href="/repurposer" active={pathname === "/repurposer"}>Repurposer</NavLink>
-            <NavLink href="/visualizer" active={pathname === "/visualizer"}>Visualizer</NavLink>
+            <NavLink href="/dashboard" active={pathname === "/dashboard"}>Command Center</NavLink>
+            <NavLink href="/studio" active={pathname === "/studio"}>Studio</NavLink>
             <NavLink href="/video" active={pathname === "/video"}>Video Suite</NavLink>
-            <NavLink href="/writer" active={pathname === "/writer"}>Writer</NavLink>
             <NavLink href="/scheduler" active={pathname === "/scheduler"}>Scheduler</NavLink>
             <NavLink href="/pricing" active={pathname === "/pricing"}>Pricing</NavLink>
           </>
         )}
+      </div>
 
-        {/* Auth Buttons */}
-        <div className="ml-4 pl-4 border-l border-white/10">
-          {!isLoaded ? (
-            <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
-          ) : isSignedIn ? (
-            // FIX: Replaced deprecated props with appearance customization
+      {/* Auth / Actions */}
+      <div className="flex items-center gap-4">
+        {!isLoaded ? (
+          <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+        ) : isSignedIn ? (
+          <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
+                <Sparkles className="w-3 h-3 text-orange-400" />
+                <span className="text-xs font-bold text-orange-200">PRO</span>
+            </div>
             <UserButton 
               appearance={{
                 elements: {
-                  avatarBox: "w-9 h-9 border-2 border-white/10 hover:border-cyan-500 transition-colors"
+                  avatarBox: "w-9 h-9 border-2 border-white/10 hover:border-orange-500 transition-colors"
                 }
               }}
             />
-          ) : (
-            <div className="space-x-4">
-              <Link href="/sign-in">
-                <button className="text-sm hover:text-white text-slate-300 transition-colors">Sign In</button>
-              </Link>
-              <Link href="/sign-up">
-                <button className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-full text-sm transition-colors font-bold shadow-lg shadow-blue-900/20">
-                  Get Started
-                </button>
-              </Link>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <Link href="/sign-in" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+              Sign In
+            </Link>
+            <Link href="/sign-up">
+              <button className="px-5 py-2 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-white text-sm font-bold rounded-full shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all hover:scale-105">
+                Get Started
+              </button>
+            </Link>
+          </div>
+        )}
       </div>
     </nav>
   );
@@ -70,14 +73,13 @@ function NavLink({ href, children, active }: { href: string, children: React.Rea
   return (
     <Link 
       href={href} 
-      className={`text-sm font-medium transition-colors relative group ${
-        active ? "text-white" : "text-slate-400 hover:text-white"
+      className={`text-sm font-medium transition-all relative ${
+        active ? "text-white" : "text-slate-400 hover:text-cyan-400"
       }`}
     >
       {children}
-      {/* Active Indicator Dot */}
       {active && (
-        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+        <span className="absolute -bottom-6 left-0 w-full h-[2px] bg-gradient-to-r from-cyan-400 to-orange-500 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
       )}
     </Link>
   )
