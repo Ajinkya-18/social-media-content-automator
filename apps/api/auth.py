@@ -788,7 +788,7 @@ async def login_instagram():
 
     state = secrets.token_urlsafe(16)
 
-    scope = "instagram_basic,pages_show_list,pages_read_engagement"
+    scope = "pages_show_list,instagram_manage_insights"
 
     auth_url = (
         f"https://www.facebook.com/v18.0/dialog/oauth?"
