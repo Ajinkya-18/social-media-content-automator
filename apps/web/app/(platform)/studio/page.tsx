@@ -3,11 +3,10 @@
 import { useState, useEffect, Suspense } from "react";
 import { 
   Palette, ExternalLink, Layout, PlusCircle, Link as LinkIcon, 
-  Loader2, Presentation, FileText, Instagram, LogOut 
+  Loader2, Presentation, FileText, Instagram, LogOut, Wand2 
 } from "lucide-react";
 import { useSearchParams, useRouter } from 'next/navigation';
 
-// 1. Rename the logic component to StudioContent
 function StudioContent() {
   const [isConnected, setIsConnected] = useState(false);
   const [canvaId, setCanvaId] = useState<string | null>(null);
@@ -69,7 +68,6 @@ function StudioContent() {
     
     try {
         setCreating(type);
-        
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/canva/create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -81,33 +79,22 @@ function StudioContent() {
         });
         
         const data = await res.json();
-        
-        if (data.error) {
-             alert(`Error: ${data.error}`);
-             return;
-        }
+        if (data.error) { alert(`Error: ${data.error}`); return; }
 
         const editUrl = data.design?.urls?.edit_url || data.urls?.edit_url || data.url;
-        
         if (editUrl) {
             window.open(editUrl, '_blank');
             fetchDesigns(); 
-        } else {
-            console.error("Unexpected response structure:", data);
-            alert("Design created, but could not find the URL to open.");
         }
-        
     } catch (error) {
-        console.error("Creation failed", error);
         alert("Failed to connect to server.");
     } finally {
         setCreating(null);
     }
   };
 
-  // --- 4. LOGOUT HANDLER ---
   const handleLogout = () => {
-    if (confirm("Are you sure you want to disconnect your Canva account?")) {
+    if (confirm("Disconnect Canva account?")) {
         localStorage.removeItem('canva_connected');
         localStorage.removeItem('canva_id');
         setIsConnected(false);
@@ -124,29 +111,23 @@ function StudioContent() {
       <div className="border-b border-white/5 pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Palette className="text-orange-400 w-8 h-8" />
-            The Studio
+            <Palette className="text-orange-500 w-8 h-8" />
+            Design Matrix
           </h2>
-          <p className="text-slate-400 mt-1">Professional Design Suite powered by Canva.</p>
+          <p className="text-slate-400 mt-1">Direct link to Canva's design engine.</p>
         </div>
 
         {isConnected && (
            <button 
              onClick={handleLogout}
-             className="group flex items-center gap-3 pl-4 pr-2 py-2 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/50 rounded-full transition-all cursor-pointer"
-             title="Click to Disconnect"
+             className="group flex items-center gap-3 pl-4 pr-2 py-2 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/50 rounded-full transition-all"
            >
               <div className="text-right hidden sm:block">
                   <span className="block text-xs text-slate-400 group-hover:text-red-400 transition-colors">Connected</span>
                   <span className="block text-sm text-white font-medium leading-tight">Canva Account</span>
               </div>
-              <div className="relative">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center border-2 border-white/10 group-hover:border-red-500 transition-colors shadow-lg">
-                        <span className="font-bold text-white text-sm">CA</span>
-                  </div>
-                  <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <LogOut className="w-4 h-4 text-white" />
-                  </div>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center border-2 border-white/10 group-hover:border-red-500 transition-colors">
+                 <span className="font-bold text-white text-xs">CA</span>
               </div>
            </button>
         )}
@@ -156,8 +137,15 @@ function StudioContent() {
         
         {/* Left: Design List */}
         <div className="space-y-6">
-          <div className="glass-panel p-8 rounded-2xl ring-1 ring-white/5 bg-gradient-to-br from-orange-500/10 to-transparent min-h-[400px]">
-            <h3 className="text-2xl font-bold text-white mb-6">Recent Designs</h3>
+          <div className="glass-panel p-8 rounded-2xl border border-white/5 bg-[#0b1121] min-h-[400px] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex justify-between items-center mb-6 relative z-10">
+                <h3 className="text-2xl font-bold text-white">Recent Artifacts</h3>
+                <button onClick={() => fetchDesigns()} className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1">
+                    <Layout className="w-3 h-3" /> REFRESH
+                </button>
+            </div>
             
             {!isConnected ? (
                  <div className="flex flex-col items-center justify-center h-64 text-slate-500">
@@ -166,37 +154,32 @@ function StudioContent() {
                  </div>
             ) : loading ? (
                  <div className="flex items-center justify-center h-40">
-                    <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+                    <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
                  </div>
             ) : designs.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 gap-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                     {designs.map((design: any) => (
-                        <div key={design.id} className="p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 flex gap-4 items-center group">
-                            {/* Thumbnail */}
-                            <div className="w-16 h-16 rounded-lg bg-slate-800 overflow-hidden flex-shrink-0 shadow-sm">
+                        <div key={design.id} className="p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5 flex gap-4 items-center group">
+                            <div className="w-20 h-14 rounded-lg bg-slate-800 overflow-hidden flex-shrink-0 border border-white/10 group-hover:border-cyan-500/50 transition-colors">
                                 {design.thumbnail?.url ? (
                                     <img src={design.thumbnail.url} alt={design.title} className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-slate-700">
-                                        <Palette className="w-6 h-6 text-slate-500" />
-                                    </div>
+                                    <div className="w-full h-full flex items-center justify-center"><Palette className="w-4 h-4 text-slate-600" /></div>
                                 )}
                             </div>
-                            {/* Info */}
                             <div className="flex-1 min-w-0">
-                                <h4 className="text-white font-medium truncate">{design.title || "Untitled Design"}</h4>
-                                <p className="text-slate-400 text-xs mt-1">
+                                <h4 className="text-white font-bold text-sm truncate group-hover:text-cyan-400 transition-colors">{design.title || "Untitled Design"}</h4>
+                                <p className="text-slate-500 text-xs mt-1">
                                     Last edited: {new Date(design.updated_at * 1000).toLocaleDateString()}
                                 </p>
                             </div>
-                            {/* Edit Button */}
                             <a 
                                 href={design.urls?.edit_url} 
                                 target="_blank"
                                 rel="noreferrer"
-                                className="px-4 py-2 text-xs font-bold text-slate-900 bg-orange-400 hover:bg-orange-300 rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0"
+                                className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-cyan-600 hover:shadow-lg hover:shadow-cyan-500/20 rounded-lg transition-all"
                             >
-                                Edit
+                                <ExternalLink className="w-4 h-4" />
                             </a>
                         </div>
                     ))}
@@ -204,79 +187,57 @@ function StudioContent() {
             ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-slate-500">
                     <p>No recent designs found.</p>
-                    <button onClick={() => fetchDesigns()} className="mt-4 text-orange-400 hover:underline text-sm">Refresh List</button>
                 </div>
             )}
           </div>
         </div>
 
         {/* Right: Action Area */}
-        <div className="flex flex-col items-center justify-center space-y-6 sticky top-8">
+        <div className="flex flex-col space-y-6 sticky top-28">
             
             {!isConnected ? (
               <button
                 onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/auth/canva/login`}
-                className="group relative w-full max-w-md h-64 glass-panel rounded-2xl ring-1 ring-white/10 hover:ring-orange-500/50 transition-all duration-500 flex flex-col items-center justify-center overflow-hidden bg-slate-900 cursor-pointer shadow-2xl"
+                className="group relative w-full max-w-md mx-auto h-64 rounded-2xl border border-white/10 bg-[#0b1121] hover:border-cyan-500/50 transition-all duration-500 flex flex-col items-center justify-center overflow-hidden cursor-pointer shadow-2xl"
               >
-                <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-inner">
-                   <LinkIcon className="w-8 h-8 text-slate-400 group-hover:text-white" />
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform border border-white/10 z-10">
+                   <LinkIcon className="w-8 h-8 text-cyan-400" />
                 </div>
-                <h4 className="text-2xl font-bold text-white">Connect Canva</h4>
-                <p className="text-slate-500 mt-2 text-sm">Grant permission to access designs</p>
-                <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl group-hover:bg-orange-500/30 transition-colors pointer-events-none" />
+                <h4 className="text-xl font-bold text-white z-10">Initialize Connection</h4>
+                <p className="text-slate-500 mt-2 text-sm z-10">Grant access to Canva designs</p>
               </button>
             ) : (
-              <div className="w-full max-w-md space-y-4">
-                 <button
-                   disabled={!!creating}
-                   onClick={() => handleCreate('presentation')}
-                   className="w-full h-24 glass-panel rounded-xl flex items-center px-6 gap-4 hover:bg-orange-500/10 transition-all border border-white/5 group relative overflow-hidden"
-                 >
-                    <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-colors z-10">
-                        {creating === 'presentation' ? <Loader2 className="animate-spin w-6 h-6" /> : <Presentation className="w-6 h-6 text-orange-500 group-hover:text-white" />}
-                    </div>
-                    <div className="text-left z-10">
-                        <span className="block text-lg font-bold text-white">New Presentation</span>
-                        <span className="text-xs text-slate-400">16:9 Format • Slides</span>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 to-orange-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
-                 </button>
-
-                 <button
-                   disabled={!!creating}
-                   onClick={() => handleCreate('social')}
-                   className="w-full h-24 glass-panel rounded-xl flex items-center px-6 gap-4 hover:bg-purple-500/10 transition-all border border-white/5 group relative overflow-hidden"
-                 >
-                    <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500 group-hover:text-white transition-colors z-10">
-                        {creating === 'social' ? <Loader2 className="animate-spin w-6 h-6" /> : <Instagram className="w-6 h-6 text-purple-500 group-hover:text-white" />}
-                    </div>
-                    <div className="text-left z-10">
-                        <span className="block text-lg font-bold text-white">New Social Post</span>
-                        <span className="text-xs text-slate-400">1080x1080 • Instagram/LinkedIn</span>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 to-purple-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
-                 </button>
-
-                 <button
-                   disabled={!!creating}
-                   onClick={() => handleCreate('doc')}
-                   className="w-full h-24 glass-panel rounded-xl flex items-center px-6 gap-4 hover:bg-blue-500/10 transition-all border border-white/5 group relative overflow-hidden"
-                 >
-                    <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-colors z-10">
-                        {creating === 'doc' ? <Loader2 className="animate-spin w-6 h-6" /> : <FileText className="w-6 h-6 text-blue-500 group-hover:text-white" />}
-                    </div>
-                    <div className="text-left z-10">
-                        <span className="block text-lg font-bold text-white">New Doc</span>
-                        <span className="text-xs text-slate-400">Vertical Document • Reports</span>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-blue-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
-                 </button>
+              <div className="w-full max-w-md mx-auto space-y-4">
+                 <CreateButton 
+                    label="Presentation" 
+                    sub="16:9 Format"
+                    icon={<Presentation />} 
+                    color="text-orange-500"
+                    loading={creating === 'presentation'}
+                    onClick={() => handleCreate('presentation')}
+                 />
+                 <CreateButton 
+                    label="Social Post" 
+                    sub="1080x1080 • Instagram"
+                    icon={<Instagram />} 
+                    color="text-purple-500"
+                    loading={creating === 'social'}
+                    onClick={() => handleCreate('social')}
+                 />
+                 <CreateButton 
+                    label="Document" 
+                    sub="Vertical • A4"
+                    icon={<FileText />} 
+                    color="text-blue-500"
+                    loading={creating === 'doc'}
+                    onClick={() => handleCreate('doc')}
+                 />
                  
-                 <div className="mt-4 text-center">
-                    <span className="text-xs text-slate-600 flex items-center justify-center gap-2">
-                        <Layout className="w-3 h-3" />
-                        {designs.length} designs synced
-                    </span>
+                 <div className="mt-6 p-4 rounded-xl bg-cyan-900/10 border border-cyan-500/20 text-center">
+                    <p className="text-cyan-400 text-xs font-bold tracking-wide">
+                        {designs.length} DESIGNS SYNCED
+                    </p>
                  </div>
               </div>
             )}
@@ -286,12 +247,31 @@ function StudioContent() {
   );
 }
 
-// 2. Export the Wrapped Component
+function CreateButton({ label, sub, icon, color, loading, onClick }: any) {
+    return (
+        <button
+            disabled={loading}
+            onClick={onClick}
+            className="w-full h-24 rounded-xl flex items-center px-6 gap-5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-orange-500/30 transition-all group relative overflow-hidden"
+        >
+            <div className={`w-12 h-12 rounded-xl bg-[#030712] border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform z-10 ${color}`}>
+                {loading ? <Loader2 className="animate-spin w-6 h-6" /> : icon}
+            </div>
+            <div className="text-left z-10">
+                <span className="block text-lg font-bold text-white group-hover:text-orange-400 transition-colors">{label}</span>
+                <span className="text-xs text-slate-500">{sub}</span>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/0 to-orange-500/5 translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
+            <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-orange-500 group-hover:w-full transition-all duration-700" />
+        </button>
+    )
+}
+
 export default function StudioPage() {
   return (
     <Suspense fallback={
       <div className="flex justify-center items-center min-h-screen bg-black">
-        <Loader2 className="w-10 h-10 text-orange-500 animate-spin"/>
+        <Loader2 className="w-10 h-10 text-cyan-500 animate-spin"/>
       </div>
     }>
       <StudioContent />
