@@ -30,14 +30,20 @@ export default function SchedulerPage() {
         const data = await res.json();
         
         // Transform Google Calendar events to Kanban format
-        const formattedTasks = data.map((ev: any) => ({
-           id: ev.id,
-           title: ev.summary,
-           description: ev.description || "",
-           date: new Date(ev.start.date || ev.start.dateTime).toLocaleDateString(),
-           // The "Truth" is now in the description tag, not just the date
-           status: determineStatus(ev) 
-        }));
+        const formattedTasks = data.map((ev: any) => {
+           // Create date object for comparison
+           const eventDate = new Date(ev.start.date || ev.start.dateTime);
+           
+           return {
+             id: ev.id,
+             title: ev.summary,
+             description: ev.description || "",
+             // Store raw date for logic, formatted string for display
+             rawDate: eventDate, 
+             date: eventDate.toLocaleDateString(),
+             status: determineStatus(ev) 
+           };
+        });
         setTasks(formattedTasks);
       }
     } catch (error) {
@@ -53,14 +59,16 @@ export default function SchedulerPage() {
           return 'done';
       }
 
-      // 2. Date-based fallback
-      const taskDate = new Date(ev.start.date || ev.start.dateTime);
-      const today = new Date();
+      // 2. Date-based sorting
+      const taskDate = new Date(ev.start.date || ev.start.dateTime).setHours(0,0,0,0);
+      const today = new Date().setHours(0,0,0,0);
       
-      // If it's in the past but NOT marked complete, it's "Overdue" or just "In Production"
-      // For simplicity, let's keep it in 'todo' so user is forced to mark it done
-      if (Math.abs(taskDate.getTime() - today.getTime()) < 86400000 * 7) return 'todo'; // Within 7 days
+      // If date is Today or in the Past -> PENDING (TODAY)
+      if (taskDate <= today) {
+          return 'todo';
+      }
       
+      // If date is Future -> UPCOMING
       return 'idea';
   };
 
@@ -70,7 +78,7 @@ export default function SchedulerPage() {
 
       setProcessingId(taskId);
       
-      // Toggle logic
+      // If currently done, move back to todo (Pending). If not done, move to done (Completed).
       const newStatus = currentStatus === 'done' ? 'todo' : 'done';
 
       try {
@@ -85,7 +93,7 @@ export default function SchedulerPage() {
           });
 
           if (res.ok) {
-              // Optimistic UI Update (Instant feedback)
+              // Optimistic UI Update: This automatically shifts the card to the new column
               setTasks(prev => prev.map(t => 
                   t.id === taskId ? { ...t, status: newStatus } : t
               ));
@@ -161,21 +169,21 @@ export default function SchedulerPage() {
       {/* Kanban Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Column 
-            title="Upcoming / Ideas" 
+            title="UPCOMING" 
             color="cyan" 
             tasks={tasks.filter(t => t.status === 'idea')} 
             onToggle={toggleTaskStatus} 
             processingId={processingId}
         />
         <Column 
-            title="In Production" 
+            title="PENDING (TODAY)" 
             color="blue" 
             tasks={tasks.filter(t => t.status === 'todo')} 
             onToggle={toggleTaskStatus} 
             processingId={processingId}
         />
         <Column 
-            title="Published / Done" 
+            title="COMPLETED" 
             color="orange" 
             tasks={tasks.filter(t => t.status === 'done')} 
             onToggle={toggleTaskStatus} 
@@ -211,7 +219,9 @@ function Column({ title, color, tasks, onToggle, processingId }: any) {
                 {tasks.map((task: any) => (
                     <div key={task.id} className={`p-5 rounded-xl bg-[#0b1121] border border-white/5 border-l-4 ${borderColors[color]} hover:translate-y-[-2px] transition-transform shadow-lg group relative`}>
                         <div className="flex justify-between items-start mb-2">
-                            <h4 className="font-bold text-white group-hover:text-cyan-400 transition-colors line-clamp-2 pr-8">{task.title}</h4>
+                            <h4 className={`font-bold transition-colors line-clamp-2 pr-8 ${task.status === 'done' ? 'text-slate-500 line-through decoration-slate-600' : 'text-white group-hover:text-cyan-400'}`}>
+                                {task.title}
+                            </h4>
                             
                             {/* MARK COMPLETE ACTION */}
                             <button 
