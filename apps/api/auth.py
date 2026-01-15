@@ -941,7 +941,7 @@ async def mark_calendar_event_complete(payload: UpdateEventStatusRequest):
             if "[COMPLETED]" not in current_desc:
                 changes['description'] = f"{current_desc}\n\n[COMPLETED]"
 
-            changes = ['colorId'] = '10'
+            changes['colorId'] = '10'
 
         else:
             changes['description'] = current_desc.replace("\n\n[COMPLETED]", "").replace("[COMPLETED]", "")
