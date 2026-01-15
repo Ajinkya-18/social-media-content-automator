@@ -27,6 +27,16 @@ supabase: Client = create_client(
     os.getenv("SUPABASE_KEY")
 )
 
+SCOPES = [
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/drive.file",
+    "openid"
+]
+
 groq_api_key = os.getenv("GROQ_API_KEY")
 
 client = Groq(
@@ -97,7 +107,7 @@ async def generate_script(req: GenerateRequest):
 @app.post("/save-script")
 async def save_script(request: DriveScriptRequest):
     try:
-        creds = get_google_creds(request.email, supabase=supabase)
+        creds = get_google_creds(request.email)
 
         service = build('drive', 'v3', credentials=creds)
 
@@ -148,7 +158,7 @@ def sanitize_filename(name:str) -> str:
 
     return name
 
-def get_google_creds(email:str, supabase=supabase):
+def get_google_creds(email:str):
     response = supabase.table("social_tokens")\
         .select("access_token, refresh_token")\
             .eq("user_email", email).execute()
@@ -170,7 +180,7 @@ def get_google_creds(email:str, supabase=supabase):
 @app.post("/save-image")
 async def save_image(request: DriveImageRequest):
     try:
-        creds = get_google_creds(email=request.email, supabase=supabase)
+        creds = get_google_creds(email=request.email)
         service = build('drive', 'v3', credentials=creds)
 
         safe_name = sanitize_filename(request.file_name)
