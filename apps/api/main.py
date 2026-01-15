@@ -76,7 +76,7 @@ async def generate_script(req: GenerateRequest):
                     "content": f"Write a script for: {req.prompt}. Keep the tone {req.tone}.",
                 }
             ],
-            model="llama3-70b",
+            model="llama3-70b-8192",
         )
 
         generated_text = chat_completion.choices[0].message.content
@@ -223,7 +223,7 @@ async def repurpose_content(req: RepurposeRequest):
                     "content": f"Script: {req.script}\n\nTone: {req.tone}",
                 }
             ],
-            model="llama3-70b",
+            model="llama3-70b-8192",
             response_format={"type": "json_object"}
         )
 
