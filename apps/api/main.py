@@ -15,6 +15,7 @@ from auth import router as auth_router
 from analytics import router as analytics_router
 from webhooks import router as webhooks_router
 from video import router as video_router
+import json
 
 
 load_dotenv()
@@ -190,4 +191,50 @@ async def health_def():
         "system": "Studio - FlowState v1.0",
         "motto": "Our creativity awakens when the world sleeps."
     }
+
+class RepurposeRequest(BaseModel):
+    script: str
+    tone: str = "engaging"
+
+@app.post("/api/repurpose")
+async def repurpose_content(req: RepurposeRequest):
+    try:
+        system_prompt = """
+        You are an expert Social Media Manager. 
+        Analyze the provided video script and repurpose it into three distinct formats.
+        
+        Output MUST be valid JSON with the following structure:
+        {
+            "twitter": "A thread of 3-5 tweets. Separate tweets with double newlines.",
+            "linkedin": "A professional, storytelling-style post with bullet points.",
+            "instagram": "A catchy caption with emojis and 5-7 hashtags."
+        }
+        Do not add any text outside the JSON object.
+        """
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": f"Script: {req.script}\n\nTone: {req.tone}",
+                }
+            ],
+            model="llama3-70b",
+            response_format={"type": "json_object"}
+        )
+
+        content = chat_completion.choices[0].message.content
+
+        parsed_content = json.loads(content)
+        
+        return parsed_content
+
+    except Exception as e:
+        print(f"Repurposer Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI Processing Failed: {str(e)}")
+
 
