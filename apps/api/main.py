@@ -53,14 +53,13 @@ def read_root():
     return {"status": "AfterGlow API is running"}
 
 class DriveScriptRequest(BaseModel):
-    token: str
+    email: str
     content: str
     file_name: str = "AfterGlow_Script.docx"
 
 class GenerateRequest(BaseModel):
     prompt: str
     tone: str = "professional"
-
 
 @app.post("/api/generate-script")
 async def generate_script(req: GenerateRequest):
@@ -91,13 +90,19 @@ async def generate_script(req: GenerateRequest):
 @app.post("/save-script")
 async def save_script(request: DriveScriptRequest):
     try:
-        file_stream = io.BytesIO(request.content.encode('utf-8'))
-        
-        creds = Credentials(token=request.token)
+        creds = get_google_creds(request.email)
+
         service = build('drive', 'v3', credentials=creds)
 
+        safe_name = sanitize_filename(request.file_name)
+
+        if not safe_name.endswith('.docx'):
+            safe_name += ".docx"
+
+        file_stream = io.BytesIO(request.content.encode('utf-8'))
+
         file_metadata = {
-            'name': request.file_name,
+            'name': safe_name,
             'mimeType': 'application/vnd.google-apps.document'
         }
 
@@ -124,7 +129,7 @@ async def save_script(request: DriveScriptRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 class DriveImageRequest(BaseModel):
-    token: str
+    email: str
     image_data: str
     file_name: str = "AfterGlow_Visual.webp"
 
@@ -136,14 +141,35 @@ def sanitize_filename(name:str) -> str:
 
     return name
 
+def get_google_creds(email:str):
+    response = supabase.table("social_tokens")\
+        .select("access_token, refresh_token")\
+            .eq("user_email", email).execute()
+
+    if not response.data:
+        raise HTTPException(401, "Google account not connected. Please connect Youtube in dashboard.")
+
+    token_data = response.data[0]
+
+    return Credentials(
+        token=token_data['access_token'],
+        refresh_token=token_data['refresh_token'],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=SCOPES
+    )
+
 @app.post("/save-image")
 async def save_image(request: DriveImageRequest):
     try:
+        creds = get_google_creds(request.email)
+        service = build('drive', 'v3', credentials=creds)
+
         safe_name = sanitize_filename(request.file_name)
 
         if not safe_name.endswith('.webp'):
             safe_name += ".webp"
-
 
         if "base64," in request.image_data:
             header, encoded = request.image_data.split("base64,", 1)
@@ -153,9 +179,6 @@ async def save_image(request: DriveImageRequest):
 
         image_bytes = base64.b64decode(encoded)
         file_stream = io.BytesIO(image_bytes)
-
-        creds = Credentials(token=request.token)
-        service = build('drive', 'v3', credentials=creds)
 
         file_metadata = {
             'name': safe_name,
