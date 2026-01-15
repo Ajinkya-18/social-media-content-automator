@@ -97,7 +97,7 @@ async def generate_script(req: GenerateRequest):
 @app.post("/save-script")
 async def save_script(request: DriveScriptRequest):
     try:
-        creds = get_google_creds(request.email)
+        creds = get_google_creds(request.email, supabase=supabase)
 
         service = build('drive', 'v3', credentials=creds)
 
@@ -148,7 +148,7 @@ def sanitize_filename(name:str) -> str:
 
     return name
 
-def get_google_creds(supabase=supabase, email:str):
+def get_google_creds(email:str, supabase=supabase):
     response = supabase.table("social_tokens")\
         .select("access_token, refresh_token")\
             .eq("user_email", email).execute()
@@ -170,7 +170,7 @@ def get_google_creds(supabase=supabase, email:str):
 @app.post("/save-image")
 async def save_image(request: DriveImageRequest):
     try:
-        creds = get_google_creds(supabase=supabase, email=request.email)
+        creds = get_google_creds(email=request.email, supabase=supabase)
         service = build('drive', 'v3', credentials=creds)
 
         safe_name = sanitize_filename(request.file_name)
