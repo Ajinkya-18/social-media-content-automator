@@ -56,7 +56,14 @@ async def generate_video(payload: VideoRequest):
             }
         )
 
-        video_url = output[0] if isinstance(output, list) else output
+        if hasattr(output, 'url'):
+            video_url = output.url
+        
+        elif isinstance(output, list) and len(output) > 0:
+            video_url = output[0].url if hasattr(output[0], 'url') else str(output[0])
+
+        else:
+            video_url = str(output)
 
         new_balance = credits - VIDEO_COST
 
