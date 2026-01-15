@@ -1,195 +1,118 @@
 "use client";
 
 import { useState } from "react";
-// Correct relative path to actions.ts based on your directory structure
-import { generatePost } from "../../actions"; 
-import { useGoogleDrive } from "../../hooks/useGoogleDrive"; 
-import AfterGlowToast from "../../components/AfterGlowToast"; 
-import { PenTool, Sparkles, Save, Copy } from "lucide-react";
+import { PenTool, Loader2, Wand2, Copy, Check } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 
 export default function WriterPage() {
-  const [topic, setTopic] = useState("");
-  const [vibe, setVibe] = useState("Professional");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState("");
-  
-  // New: Script Title for the file name
-  const [scriptTitle, setScriptTitle] = useState(""); 
-
-  // Initialize the Drive Hook
-  const { 
-    saveScriptToDrive, 
-    isSaving, 
-    saveSuccessLink, 
-    resetSaveState 
-  } = useGoogleDrive();
+  const { user } = useUser();
+  const [loading, setLoading] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [output, setOutput] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [tone, setTone] = useState("engaging");
 
   const handleGenerate = async () => {
-    if (!topic) return;
-    setIsLoading(true);
-    setResult(""); 
-
+    if (!prompt.trim()) return;
+    setLoading(true);
+    
     try {
-      // THE REAL LLM CALL
-      const response = await generatePost(`${vibe} post about ${topic}`);
-      
-      if (response.success) {
-        setResult(response.content);
-        // Auto-generate a title if one isn't set
-        if (!scriptTitle) {
-          setScriptTitle(`${vibe} Post: ${topic.substring(0, 20)}...`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/generate-script`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, tone })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            setOutput(data.script);
+        } else {
+            alert("Generation failed. Please try again.");
         }
-      } else {
-        alert("Failed to generate content");
-      }
-    } catch (error) {
-      console.error("Error generating:", error);
-      setResult("Something went wrong. Please check your API keys.");
+    } catch (e) {
+        console.error(e);
+        alert("Server error");
     } finally {
-      setIsLoading(false);
+        setLoading(false);
     }
   };
 
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(output);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 relative">
+    <div className="max-w-6xl mx-auto px-6 py-8 animate-in fade-in duration-500 h-[calc(100vh-140px)] flex flex-col">
       
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/5 pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            <PenTool className="text-purple-400 w-8 h-8" />
-            The Synapse
-          </h2>
-          <p className="text-slate-400 mt-1">AI-Powered Screenplay Architect.</p>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <PenTool className="w-8 h-8 text-cyan-400" />
+            Ghost<span className="bg-gradient-to-r from-cyan-400 to-blue-500 text-transparent bg-clip-text">Writer</span>
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">Powered by Llama 3 on Groq</p>
         </div>
         
-        {/* Title Input (For File Name) */}
-        <div className="flex items-center gap-4">
-           <input 
-             type="text" 
-             value={scriptTitle}
-             onChange={(e) => setScriptTitle(e.target.value)}
-             className="bg-transparent border-b border-white/20 text-right text-white focus:border-purple-500 outline-none px-2 py-1 placeholder-slate-600 w-64"
-             placeholder="Name your script (for Drive)..."
-           />
+        <div className="flex bg-[#0b1121] rounded-lg p-1 border border-white/10">
+            {['engaging', 'professional', 'funny'].map((m) => (
+                <button 
+                    key={m}
+                    onClick={() => setTone(m)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize ${tone === m ? 'bg-cyan-500/20 text-cyan-400 shadow-sm border border-cyan-500/30' : 'text-slate-400 hover:text-white'}`}
+                >
+                    {m}
+                </button>
+            ))}
         </div>
       </div>
 
-      {/* Main Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-8 min-h-0">
         
-        {/* LEFT: Controls */}
-        <div className="lg:col-span-1 space-y-6">
-           <div className="glass-panel p-6 rounded-2xl ring-1 ring-white/5">
-              <label className="text-sm text-cyan-400 font-semibold uppercase tracking-wider">Input Source</label>
-              <textarea 
-                className="w-full mt-3 bg-slate-950/50 border border-slate-700 rounded-xl p-3 text-slate-200 h-32 focus:border-cyan-500 outline-none resize-none text-sm placeholder-slate-600"
-                placeholder="Describe your vision..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-              />
-
-              {/* Vibe Selector */}
-              <div className="mt-6">
-                <label className="text-sm text-purple-400 font-semibold uppercase tracking-wider">Tone</label>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {["Professional", "Casual", "Viral", "Storytelling"].map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setVibe(v)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                        vibe === v
-                          ? "bg-cyan-500/10 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.2)]"
-                          : "bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button 
-                onClick={handleGenerate}
-                disabled={isLoading || !topic}
-                className={`w-full mt-6 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-900/20 ${
-                  isLoading || !topic ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-              >
-                <Sparkles className="w-4 h-4" />
-                {isLoading ? "Synthesizing..." : "Generate Script"}
-              </button>
-           </div>
-        </div>
-
-        {/* RIGHT: Editor & Actions */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="glass-panel p-6 rounded-2xl ring-1 ring-white/5 min-h-[500px] relative bg-slate-900/50 flex flex-col">
-            
-            {/* Output Header */}
-            <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
-               <span className="text-xs font-mono text-slate-500 uppercase tracking-widest">Output Stream</span>
-               {result && <span className="text-xs text-green-400 flex items-center gap-1">● Active</span>}
+        {/* Input */}
+        <div className="flex flex-col gap-4">
+            <div className="flex-1 relative group">
+                <textarea 
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe your video idea... (e.g., A 60-second vertical script about the history of coffee)"
+                    className="w-full h-full bg-[#0b1121] border border-white/10 rounded-2xl p-6 text-slate-300 placeholder:text-slate-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none resize-none font-mono text-sm leading-relaxed transition-all"
+                />
             </div>
-
-            {/* The Text Area */}
-            {result ? (
-               <textarea 
-                 value={result}
-                 onChange={(e) => setResult(e.target.value)}
-                 className="w-full flex-grow bg-transparent outline-none text-slate-300 font-mono resize-none leading-relaxed text-sm p-2 focus:bg-slate-950/30 rounded-lg transition-colors"
-               />
-            ) : (
-               <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600 opacity-50 pointer-events-none">
-                 <PenTool className="w-12 h-12 mb-4" />
-                 <p className="font-mono text-sm tracking-widest uppercase">Awaiting Data</p>
-               </div>
-            )}
-          </div>
-
-          {/* Action Bar (Copy & Save) */}
-          <div className="flex justify-end gap-3">
-             <button 
-               onClick={() => navigator.clipboard.writeText(result)}
-               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-             >
-               <Copy className="w-4 h-4" /> Copy
-             </button>
-
-             {/* The Standardized Save Button */}
-             <button 
-               onClick={() => saveScriptToDrive(result, scriptTitle || topic || "Untitled Script")}
-               disabled={isSaving || !result}
-               className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold transition-all border border-white/10
-                 ${isSaving 
-                   ? "bg-purple-900/40 text-purple-300 cursor-wait" 
-                   : "bg-slate-800 text-white hover:bg-slate-700 hover:border-purple-500"
-                 }`}
-             >
-               {isSaving ? (
-                 <>
-                   <div className="w-4 h-4 border-2 border-white/30 border-t-purple-400 rounded-full animate-spin" />
-                   Saving...
-                 </>
-               ) : (
-                 <>
-                   <Save className="w-4 h-4" /> Save to Drive
-                 </>
-               )}
-             </button>
-          </div>
+            <button 
+                onClick={handleGenerate}
+                disabled={loading || !prompt}
+                className="py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold shadow-[0_0_20px_rgba(8,145,178,0.3)] flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <><Wand2 className="w-5 h-5" /> Generate Script</>}
+            </button>
         </div>
+
+        {/* Output */}
+        <div className="relative bg-[#0b1121] border border-white/10 rounded-2xl p-6 overflow-hidden group flex flex-col">
+            {output ? (
+                <>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <button onClick={copyToClipboard} className="p-2 bg-white/10 hover:bg-cyan-500 hover:text-white rounded-lg transition-colors border border-white/5">
+                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                        <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap font-mono text-slate-300">
+                            {output}
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-4">
+                    <PenTool className="w-12 h-12 opacity-20" />
+                    <p className="text-sm font-mono">AI Output will appear here</p>
+                </div>
+            )}
+        </div>
+
       </div>
-
-      {/* The Aesthetic Toast */}
-      {saveSuccessLink && (
-        <AfterGlowToast 
-          fileLink={saveSuccessLink} 
-          onClose={resetSaveState}
-          type="Script" 
-        />
-      )}
-
     </div>
   );
 }

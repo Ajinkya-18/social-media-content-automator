@@ -903,4 +903,61 @@ async def get_instagram_stats(instagram_id: str):
         print(f"IG Stats Error: {e}")
         raise HTTPException(500, str(e))
 
+class UpdateEventStatusRequest(BaseModel):
+    email: str
+    event_id: str
+    status: str
+
+@router.post("/calendar/mark-complete")
+async def mark_calendar_event_complete(payload: UpdateEventStatusRequest):
+    try:
+        response = supabase.table("social_tokens")\
+            .select("access_token, refresh_token")\
+            .eq("user_email", payload.email).execute()
+
+        if not response.data:
+            raise HTTPException(401, "User not connected")
+
+        token_data = response.data[0]
+
+        creds = Credentials(
+            token=token_data['access_token'],
+            refresh_token=token_data['refresh_token'],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=SCOPES
+        )
+
+        service = build('calendar', 'v3', credentials=creds)
+
+        event = service.events().get(calendarId='primary', eventId=payload.event_id).execute()
+
+        current_desc = event.get('description', '')
+
+        changes = {}
+
+        if payload.status == 'done':
+            if "[COMPLETED]" not in current_desc:
+                changes['description'] = f"{current_desc}\n\n[COMPLETED]"
+
+            changes = ['colorId'] = '10'
+
+        else:
+            changes['description'] = current_desc.replace("\n\n[COMPLETED]", "").replace("[COMPLETED]", "")
+
+            changes['colorId'] = None
+
+        updated_event = service.events().patch(
+            calendarId='primary',
+            eventId=payload.event_id,
+            body=changes
+        ).execute()
+
+        return {"status": "success", "event": updated_event}
+
+    except Exception as e:
+        print(f"Calendar Update Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
