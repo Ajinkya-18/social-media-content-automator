@@ -1,23 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Layers, Twitter, Linkedin, Instagram, ArrowRight, Save, Copy, Repeat, Loader2, Sparkles } from "lucide-react";
-import AfterGlowToast from "../../components/AfterGlowToast"; // Ensure path is correct
+// Ensure you have the useUser hook for email
+import { useUser } from "@clerk/nextjs";
+import { Layers, Twitter, Linkedin, Instagram, ArrowRight, Save, Copy, Repeat, Loader2, Sparkles, CalendarPlus, Check } from "lucide-react";
+import AfterGlowToast from "../../components/AfterGlowToast";
 
 export default function RepurposerPage() {
+  const { user } = useUser(); // Get User for Calendar Sync
   const [inputContent, setInputContent] = useState("");
   const [activeTab, setActiveTab] = useState("twitter");
   const [isLoading, setIsLoading] = useState(false);
   const [tone, setTone] = useState("engaging");
   
-  // Store results
+  // Scheduling State
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState(false);
+  
   const [results, setResults] = useState({
     twitter: "",
     linkedin: "",
     instagram: ""
   });
 
-  // Simple copy feedback state
   const [copySuccess, setCopySuccess] = useState(false);
 
   const handleRemix = async () => {
@@ -38,7 +43,6 @@ export default function RepurposerPage() {
 
       const data = await res.json();
       
-      // Update all tabs at once
       setResults({
         twitter: data.twitter,
         linkedin: data.linkedin,
@@ -59,6 +63,48 @@ export default function RepurposerPage() {
         navigator.clipboard.writeText(text);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
+    }
+  };
+
+  // --- NEW: SCHEDULE FUNCTION ---
+  const handleSchedule = async () => {
+    const content = results[activeTab as keyof typeof results];
+    if (!content) return;
+    if (!user?.primaryEmailAddress?.emailAddress) {
+        alert("Please sign in to schedule posts.");
+        return;
+    }
+
+    setIsScheduling(true);
+
+    // Default to scheduling for "Tomorrow at 10 AM" for simplicity
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendar/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: user.primaryEmailAddress.emailAddress,
+                title: `[${activeTab.toUpperCase()}] Content Release`,
+                description: content, // The AI generated text goes into the event description
+                date: dateStr
+            })
+        });
+
+        if (res.ok) {
+            setScheduleSuccess(true);
+            setTimeout(() => setScheduleSuccess(false), 3000);
+        } else {
+            alert("Failed to sync with Calendar. Check your permissions.");
+        }
+    } catch (e) {
+        console.error("Schedule Error", e);
+        alert("Failed to connect to scheduler.");
+    } finally {
+        setIsScheduling(false);
     }
   };
 
@@ -173,13 +219,25 @@ export default function RepurposerPage() {
                     >
                         {copySuccess ? "Copied!" : <><Copy className="w-3 h-3" /> Copy</>}
                     </button>
-                    {/* Placeholder for future "Post Now" feature */}
+                    
+                    {/* NEW: SCHEDULE BUTTON */}
                     <button 
-                        disabled 
-                        className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-xs font-bold flex items-center gap-2 cursor-not-allowed opacity-50"
-                        title="Coming Soon"
+                        onClick={handleSchedule}
+                        disabled={isScheduling || !results[activeTab as keyof typeof results]}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
+                            scheduleSuccess 
+                            ? "bg-green-500/20 text-green-400 border border-green-500/50"
+                            : "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/50"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                        <ArrowRight className="w-3 h-3" /> Post (Soon)
+                        {isScheduling ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : scheduleSuccess ? (
+                            <Check className="w-3 h-3" />
+                        ) : (
+                            <CalendarPlus className="w-3 h-3" />
+                        )}
+                        {scheduleSuccess ? "Added to Timeline" : "Schedule"}
                     </button>
                 </div>
             </div>
