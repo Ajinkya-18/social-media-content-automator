@@ -19,7 +19,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import stripe
 import razorpay
-import supabase
+# import supabase
 
 
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'

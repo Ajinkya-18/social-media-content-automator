@@ -16,11 +16,16 @@ from analytics import router as analytics_router
 from webhooks import router as webhooks_router
 from video import router as video_router
 import json
-import supabase
+# import supabase
 from supabase import create_client, Client
 
 
 load_dotenv()
+
+supabase: Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 
@@ -143,7 +148,7 @@ def sanitize_filename(name:str) -> str:
 
     return name
 
-def get_google_creds(email:str):
+def get_google_creds(supabase=supabase, email:str):
     response = supabase.table("social_tokens")\
         .select("access_token, refresh_token")\
             .eq("user_email", email).execute()
@@ -165,7 +170,7 @@ def get_google_creds(email:str):
 @app.post("/save-image")
 async def save_image(request: DriveImageRequest):
     try:
-        creds = get_google_creds(request.email)
+        creds = get_google_creds(supabase=supabase, email=request.email)
         service = build('drive', 'v3', credentials=creds)
 
         safe_name = sanitize_filename(request.file_name)
