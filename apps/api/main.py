@@ -16,6 +16,8 @@ from analytics import router as analytics_router
 from webhooks import router as webhooks_router
 from video import router as video_router
 import json
+import supabase
+from supabase import create_client, Client
 
 
 load_dotenv()
