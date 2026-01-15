@@ -38,18 +38,22 @@ async def generate_video(payload: VideoRequest):
 
         print(f"Generating video for {payload.email} ({tier} tier)...")
 
-        # model = replicate.models.get("cerspense/zeroscope_v2_576w")
-        model = replicate.models.get("anotherjesse/zeroscope-v2-xl")
+        model_name = "anotherjesse/zeroscope-v2-xl"
+        model = replicate.models.get(model_name)
         latest_version = model.versions.list()[0]
+        version_id = f"{model_name}:{latest_version.id}"
 
-        output = latest_version.predict(
-            prompt=payload.prompt,
-            num_frames=num_frames,
-            width=576,
-            height=320,
-            fps=24,
-            guidance_scale=12.5,
-            num_inference_steps=50
+        output = replicate.run(
+            version_id,
+            input={
+                "prompt": payload.prompt,
+                "num_frames": num_frames,
+                "width": 576,
+                "height": 320,
+                "fps": 24,
+                "guidance_scale": 12.5,
+                "num_inference_steps": 50
+            }
         )
 
         video_url = output[0] if isinstance(output, list) else output
