@@ -70,6 +70,14 @@ async def generate_video(payload: VideoRequest):
         supabase.table("profiles").update({"credits_balance": new_balance})\
             .eq("user_email", payload.email).execute()
 
+        if payload.email:
+            supabase.table("assets").insert({
+                "user_email": payload.email,
+                "asset_type": "video",
+                "content": video_url,
+                "metadata": {"prompt": payload.prompt, "model": model_name}
+            }).execute()
+
         return {
             "video_url": video_url,
             "credits_remaining": new_balance,

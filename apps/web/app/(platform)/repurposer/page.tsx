@@ -63,7 +63,7 @@ export default function RepurposerPage() {
   };
 
   const handleRemix = async () => {
-    if (!inputContent) return;
+    if (!inputContent || !user?.primaryEmailAddress?.emailAddress) return;
     setIsLoading(true);
 
     try {
@@ -71,6 +71,7 @@ export default function RepurposerPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
+            email: user.primaryEmailAddress.emailAddress,
             script: inputContent,
             tone: tone
         }),

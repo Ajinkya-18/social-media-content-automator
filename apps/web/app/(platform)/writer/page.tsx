@@ -17,14 +17,18 @@ export default function WriterPage() {
   const [saveSuccessLink, setSaveSuccessLink] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || !user?.primaryEmailAddress?.emailAddress) return;
     setLoading(true);
     
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/generate-script`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, tone })
+            body: JSON.stringify({ 
+                email: user.primaryEmailAddress.emailAddress,
+                prompt, 
+                tone 
+            })
         });
         
         const data = await res.json();

@@ -16,18 +16,18 @@ export default function VideoPage() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSignedIn) { router.push("/sign-in"); return; }
+    if (!isSignedIn || !user?.primaryEmailAddress?.emailAddress) return; //removed { router.push("/sign-in"); }
 
     setLoading(true);
-    setError(null);
-    setVideoUrl(null);
+    // setError(null);
+    // setVideoUrl(null);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/video/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user?.primaryEmailAddress?.emailAddress,
+          email: user.primaryEmailAddress.emailAddress, // <--- SENT
           prompt: prompt,
         }),
       });

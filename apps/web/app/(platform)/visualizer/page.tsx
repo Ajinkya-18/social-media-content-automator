@@ -19,17 +19,28 @@ export default function VisualizerPage() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt) return;
+    if (!prompt || !user?.primaryEmailAddress?.emailAddress) return;
     
     setLoading(true);
     setResult(null);
 
     try {
-      const response = await generateImage(prompt, aspectRatio);
-      if (response.success && response.imageUrl) {
-        setResult(response.imageUrl);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/generate-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+              email: user.primaryEmailAddress.emailAddress, // <--- SENT
+              prompt: prompt,
+              aspect_ratio: aspectRatio
+          })
+      });
+
+      const data = await res.json();
+      
+      if (res.ok && data.imageUrl) {
+        setResult(data.imageUrl);
       } else {
-        alert("Generation failed. Please check your credits.");
+        alert("Generation failed.");
       }
     } catch (error) {
       console.error(error);

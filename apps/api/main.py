@@ -16,8 +16,9 @@ from analytics import router as analytics_router
 from webhooks import router as webhooks_router
 from video import router as video_router
 import json
-# import supabase
+import replicate
 from supabase import create_client, Client
+from vault import router as vault_router
 
 
 load_dotenv()
@@ -64,6 +65,7 @@ app.include_router(auth_router)
 app.include_router(analytics_router)
 app.include_router(webhooks_router)
 app.include_router(video_router)
+app.include_router(vault_router)
 
 @app.get("/")
 def read_root():
@@ -74,12 +76,13 @@ class DriveScriptRequest(BaseModel):
     content: str
     file_name: str = "AfterGlow_Script.docx"
 
-class GenerateRequest(BaseModel):
+class GenerateScriptRequest(BaseModel):
+    email: str
     prompt: str
     tone: str = "professional"
 
 @app.post("/api/generate-script")
-async def generate_script(req: GenerateRequest):
+async def generate_script(req: GenerateScriptRequest):
     try:
         chat_completion = client.chat.completions.create(
             messages=[
@@ -97,8 +100,15 @@ async def generate_script(req: GenerateRequest):
 
         generated_text = chat_completion.choices[0].message.content
 
+        if req.email:
+            supabase.table("assets").insert({
+                "user_email": req.email,
+                "asset_type": "script",
+                "content": generated_text,
+                "metadata": {"prompt": req.prompt, "tone": req.tone}
+            }).execute()
+
         return {"script": generated_text}
-        
 
     except Exception as e:
         print(f"Groq Error: {str(e)}")
@@ -233,6 +243,7 @@ async def health_def():
     }
 
 class RepurposeRequest(BaseModel):
+    email: str
     script: str
     tone: str = "engaging"
 
@@ -270,6 +281,14 @@ async def repurpose_content(req: RepurposeRequest):
         content = chat_completion.choices[0].message.content
 
         parsed_content = json.loads(content)
+
+        if req.email:
+            supabase.table("assets").insert({
+                "user_email": req.email,
+                "asset_type": "social_mix",
+                "content": content,
+                "metadata": {"source_length": len(req.script), "tone": req.tone}
+            }).execute()
         
         return parsed_content
 
@@ -305,5 +324,39 @@ async def parse_document(file:UploadFile=File(...)):
     except Exception as e:
         print(f"Parse Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(e)}")
+
+class ImageRequest(BaseModel):
+    email: str
+    prompt: str
+    aspect_ratio: str = "16:9"
+
+@app.post("/api/generate-image")
+async def generate_image(payload: ImageRequest):
+    try:
+        output = replicate.run(
+            "black-forest-labs/flux-schnell",
+            input={
+                "prompt": payload.prompt,
+                "aspect_ratio": payload.aspect_ratio,
+                "output_format": "webp",
+                "output_quality": 90
+            }
+        )
+
+        image_url = output[0] if isinstance(output, list) else output
+
+        if payload.email:
+            supabase.table("assets").insert({
+                "user_email": payload.email,
+                "asset_type": "image",
+                "content": image_url,
+                "metadata": {"prompt": payload.prompt, "aspect_ratio": payload.aspect_ratio}
+            }).execute()
+
+        return {"imageUrl": image_url}
+
+    except Exception as e:
+        print(f"Image Gen Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
