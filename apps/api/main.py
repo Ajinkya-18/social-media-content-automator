@@ -363,4 +363,74 @@ async def generate_image(payload: ImageRequest):
         print(f"Image Gen Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class NicheRequest(BaseModel):
+    email: str
+    niche: str
+
+class IdeaRequest(BaseModel):
+    email: str
+
+@app.post("/api/trends/set-niche")
+async def set_niche(req: NicheRequest):
+    try:
+        supabase.table("profiles").update({"niche": req.niche})\
+            .eq("user_email", req.email).execute()
+        
+        return {"status": "success", "niche": req.niche}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/trends/generate")
+async def generate_trends(req: IdeaRequest):
+    try:
+        res = supabase.table("profiles").select("niche")\
+            .eq("user_email", req.email).execute()
+
+        if not res.data:
+            raise HTTPException(404, "User profile not found.")
+
+        niche = res.data[0]['niche'] or "General Content"
+
+        system_prompt = f"""
+        You are a Viral Content Strategist. Generate 3 trending video ideas for the niche: '{niche}'.
+        
+        Return ONLY valid JSON in this format:
+        [
+          {{
+            "title": "Hooky Video Title",
+            "angle": "Why this works (1 sentence)",
+            "type": "Educational" | "Entertainment" | "Story"
+          }}
+        ]
+        """
+
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Give me 3 viral ideas now."}
+            ],
+            model="llama-3.3-70b-versatile",
+            response_format={"type": "json_object"}
+        )
+
+        content = chat_completion.choices[0].message.content
+
+        try:
+            parsed = json.loads(content)
+
+            if isinstance(parsed, dict) and "ideas" in parsed:
+                return parsed["ideas"]
+            
+            if isinstance(parsed, dict):
+                return list(parsed.values())[0]
+            
+            return parsed
+
+        except:
+            return []
+
+    except Exception as e:
+        print(f"Trend Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 

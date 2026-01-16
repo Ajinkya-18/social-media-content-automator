@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PenTool, Loader2, Wand2, Copy, Check, Save, FileEdit } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import AfterGlowToast from '../../components/AfterGlowToast';
+import { useSearchParams } from 'next/navigation';
 
 export default function WriterPage() {
+  const searchParams = useSearchParams();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -16,6 +18,12 @@ export default function WriterPage() {
   const [filename, setFilename] = useState("My_Awesome_Script");
   const [saveSuccessLink, setSaveSuccessLink] = useState<string | null>(null);
 
+  useEffect(() => {
+      const promptParam = searchParams.get('prompt');
+      if (promptParam) {
+          setPrompt(promptParam);
+      }
+  }, [searchParams]);
   const handleGenerate = async () => {
     if (!prompt.trim() || !user?.primaryEmailAddress?.emailAddress) return;
     setLoading(true);
