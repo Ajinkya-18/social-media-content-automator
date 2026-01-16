@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; // Added Suspense
 import { PenTool, Loader2, Wand2, Copy, Check, Save, FileEdit } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import AfterGlowToast from '../../components/AfterGlowToast';
 import { useSearchParams } from 'next/navigation';
 
-export default function WriterPage() {
+// 1. Move all main logic into a sub-component
+function WriterContent() {
   const searchParams = useSearchParams();
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
@@ -18,12 +19,14 @@ export default function WriterPage() {
   const [filename, setFilename] = useState("My_Awesome_Script");
   const [saveSuccessLink, setSaveSuccessLink] = useState<string | null>(null);
 
+  // This is the TrendStream connection
   useEffect(() => {
       const promptParam = searchParams.get('prompt');
       if (promptParam) {
           setPrompt(promptParam);
       }
   }, [searchParams]);
+
   const handleGenerate = async () => {
     if (!prompt.trim() || !user?.primaryEmailAddress?.emailAddress) return;
     setLoading(true);
@@ -203,5 +206,18 @@ export default function WriterPage() {
         />
       )}
     </div>
+  );
+}
+
+// 2. Export Main Page with Suspense Boundary
+export default function WriterPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-[#030712]">
+        <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
+      </div>
+    }>
+      <WriterContent />
+    </Suspense>
   );
 }
