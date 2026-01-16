@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
-// Ensure you have the useUser hook for email
+import { useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Layers, Twitter, Linkedin, Instagram, ArrowRight, Save, Copy, Repeat, Loader2, Sparkles, CalendarPlus, Check } from "lucide-react";
+import { 
+  Layers, Twitter, Linkedin, Instagram, ArrowRight, Save, Copy, Repeat, 
+  Loader2, Sparkles, CalendarPlus, Check, Upload, FileText 
+} from "lucide-react";
 import AfterGlowToast from "../../components/AfterGlowToast";
 
 export default function RepurposerPage() {
-  const { user } = useUser(); // Get User for Calendar Sync
+  const { user } = useUser();
   const [inputContent, setInputContent] = useState("");
   const [activeTab, setActiveTab] = useState("twitter");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false); // New Upload State
   const [tone, setTone] = useState("engaging");
   
   // Scheduling State
@@ -24,6 +27,40 @@ export default function RepurposerPage() {
   });
 
   const [copySuccess, setCopySuccess] = useState(false);
+  
+  // Ref for hidden file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- 1. HANDLE FILE UPLOAD ---
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/parse-document`, {
+            method: "POST",
+            body: formData,
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.detail || "Upload failed");
+
+        setInputContent(data.content);
+        
+    } catch (error: any) {
+        console.error(error);
+        alert(error.message || "Failed to upload file");
+    } finally {
+        setIsUploading(false);
+        // Reset input so same file can be selected again if needed
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleRemix = async () => {
     if (!inputContent) return;
@@ -66,7 +103,6 @@ export default function RepurposerPage() {
     }
   };
 
-  // --- NEW: SCHEDULE FUNCTION ---
   const handleSchedule = async () => {
     const content = results[activeTab as keyof typeof results];
     if (!content) return;
@@ -77,10 +113,9 @@ export default function RepurposerPage() {
 
     setIsScheduling(true);
 
-    // Default to scheduling for "Tomorrow at 10 AM" for simplicity
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = tomorrow.toISOString().split('T')[0];
 
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/calendar/create`, {
@@ -89,7 +124,7 @@ export default function RepurposerPage() {
             body: JSON.stringify({
                 email: user.primaryEmailAddress.emailAddress,
                 title: `[${activeTab.toUpperCase()}] Content Release`,
-                description: content, // The AI generated text goes into the event description
+                description: content,
                 date: dateStr
             })
         });
@@ -131,23 +166,47 @@ export default function RepurposerPage() {
         <div className="flex flex-col gap-4 h-full">
             <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Source Script / Text</label>
-                <select 
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value)}
-                    className="bg-[#0b1121] border border-white/10 text-xs text-white rounded-lg px-2 py-1 outline-none focus:border-purple-500"
-                >
-                    <option value="engaging">Engaging</option>
-                    <option value="professional">Professional</option>
-                    <option value="witty">Witty</option>
-                    <option value="controversial">Controversial</option>
-                </select>
+                
+                <div className="flex items-center gap-2">
+                    {/* HIDDEN FILE INPUT */}
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept=".txt,.md,.docx"
+                        onChange={handleFileUpload}
+                    />
+                    
+                    {/* UPLOAD BUTTON */}
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 text-xs text-purple-300 rounded-lg border border-purple-500/30 transition-all disabled:opacity-50"
+                    >
+                        {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                        {isUploading ? "Reading..." : "Import File"}
+                    </button>
+
+                    <select 
+                        value={tone}
+                        onChange={(e) => setTone(e.target.value)}
+                        className="bg-[#0b1121] border border-white/10 text-xs text-white rounded-lg px-2 py-1 outline-none focus:border-purple-500"
+                    >
+                        <option value="engaging">Engaging</option>
+                        <option value="professional">Professional</option>
+                        <option value="witty">Witty</option>
+                        <option value="controversial">Controversial</option>
+                    </select>
+                </div>
             </div>
+            
             <textarea 
                 value={inputContent}
                 onChange={(e) => setInputContent(e.target.value)}
-                placeholder="Paste your video script, blog post, or rough notes here..."
+                placeholder="Paste your script here OR upload a .docx/.txt file..."
                 className="flex-1 bg-[#0b1121] border border-white/10 rounded-2xl p-6 text-slate-300 placeholder:text-slate-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none font-mono text-sm leading-relaxed custom-scrollbar transition-all"
             />
+            
             <button 
                 onClick={handleRemix}
                 disabled={isLoading || !inputContent}
@@ -220,7 +279,7 @@ export default function RepurposerPage() {
                         {copySuccess ? "Copied!" : <><Copy className="w-3 h-3" /> Copy</>}
                     </button>
                     
-                    {/* NEW: SCHEDULE BUTTON */}
+                    {/* SCHEDULE BUTTON */}
                     <button 
                         onClick={handleSchedule}
                         disabled={isScheduling || !results[activeTab as keyof typeof results]}

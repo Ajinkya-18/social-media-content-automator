@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google.oauth2.credentials import Credentials
@@ -276,5 +276,34 @@ async def repurpose_content(req: RepurposeRequest):
     except Exception as e:
         print(f"Repurposer Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI Processing Failed: {str(e)}")
+
+@app.post("/api/parse-document")
+async def parse_document(file:UploadFile=File(...)):
+    try:
+        content = ""
+        filename = file.filename.lower()
+
+        file_bytes = await file.read()
+        file_stream = io.BytesIO(file_bytes)
+
+        if filename.endswith('.docx'):
+            doc = Document(file_stream)
+
+            content = "\n\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+
+        elif filename.endswith('.txt') or filename.endswith('.md'):
+            content = file_bytes.decode('utf-8')
+
+        else:
+            raise HTTPException(400, "Unsupported file format. Please upload .docx, .txt, or .md file type.")
+
+        if not content.strip():
+            raise HTTPException(400, "The document appears to be empty.")
+        
+        return {"status": "success", "content": content}
+
+    except Exception as e:
+        print(f"Parse Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(e)}")
 
 
