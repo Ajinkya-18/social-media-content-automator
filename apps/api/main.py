@@ -343,7 +343,11 @@ async def generate_image(payload: ImageRequest):
             }
         )
 
-        image_url = output[0] if isinstance(output, list) else output
+        if isinstance(output, list):
+            image_url = output[0].url if hasattr(output[0], 'url') else str(output[0])
+        
+        else:
+            image_url = output.url if hasattr(output, 'url') else str(output)
 
         if payload.email:
             supabase.table("assets").insert({
