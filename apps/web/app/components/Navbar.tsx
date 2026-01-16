@@ -26,13 +26,14 @@ export default function Navbar() {
         {isSignedIn && (
           <>
             <NavLink href="/dashboard" active={pathname === "/dashboard"}>Command Center</NavLink>
-            <NavLink href="/studio" active={pathname === "/studio"}>Studio</NavLink>
             <NavLink href="/video" active={pathname === "/video"}>Video Suite</NavLink>
-            <NavLink href="/scheduler" active={pathname === "/scheduler"}>Scheduler</NavLink>
-            <NavLink href="/pricing" active={pathname === "/pricing"}>Pricing</NavLink>
             <NavLink href="/repurposer" active={pathname === "/repurposer"}>Repurposer</NavLink>
             <NavLink href="/visualizer" active={pathname === "/visualizer"}>Visualizer</NavLink>
             <NavLink href="/writer" active={pathname === "/writer"}>Writer</NavLink>
+            <NavLink href="/vault" active={pathname === "/vault"}>Content Vault</NavLink>
+            <NavLink href="/scheduler" active={pathname === "/scheduler"}>Scheduler</NavLink>
+            <NavLink href="/studio" active={pathname === "/studio"}>Studio</NavLink>
+            <NavLink href="/pricing" active={pathname === "/pricing"}>Pricing</NavLink>
           </>
         )}
       </div>
