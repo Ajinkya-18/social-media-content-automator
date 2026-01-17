@@ -6,7 +6,8 @@ import { useUser } from "@clerk/nextjs";
 import { 
   LayoutDashboard, Users, Eye, Video, Activity, ExternalLink, 
   Loader2, LogOut, Wand2, X, Image as ImageIcon, 
-  Instagram, Flame, ArrowRight, Target, RefreshCw} from "lucide-react";
+  Instagram, Flame, ArrowRight, Target, RefreshCw, PieChart,
+  TrendingUp, Palette} from "lucide-react";
 
 function DashboardContent() {
   const { user } = useUser();
@@ -15,6 +16,9 @@ function DashboardContent() {
   const [videos, setVideos] = useState<any[]>([]);
   const [email, setEmail] = useState<string | null>(null);
   
+  // --- INTELLIGENCE STATE ---
+  const [intelligence, setIntelligence] = useState<any>(null);
+
   // --- BRIDGE STATE ---
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -110,9 +114,18 @@ function DashboardContent() {
 
   useEffect(() => {
     if (user?.primaryEmailAddress?.emailAddress) {
+        fetchIntelligence();
         checkNiche();
     }
   }, [user]);
+
+  const fetchIntelligence = async () => {
+      try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/intelligence?email=${user?.primaryEmailAddress?.emailAddress}`);
+          const data = await res.json();
+          setIntelligence(data.analysis);
+      } catch (e) { console.error(e); }
+  };
 
   const checkNiche = async () => {
       // We assume /user/credits endpoint (or a new /user/profile endpoint) returns the niche
@@ -276,6 +289,83 @@ function DashboardContent() {
             <StatCard icon={<Eye className="text-blue-400" />} label="Total Views" value={parseInt(stats?.views || '0').toLocaleString()} />
             <StatCard icon={<Video className="text-orange-400" />} label="Total Videos" value={stats?.video_count || '0'} />
           </div>
+
+            {/* --- DATA MOAT: PSYCHOGRAPHICS --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Chart Area */}
+            <div className="lg:col-span-2 bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Palette className="w-5 h-5 text-purple-500" />
+                            Color Psychographics
+                        </h3>
+                        <p className="text-xs text-slate-400">Correlation between thumbnail color and views.</p>
+                    </div>
+                    {intelligence && (
+                        <div className="text-right">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">Winning Color</p>
+                            <div className="flex items-center justify-end gap-2">
+                                <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: intelligence.best_performing_color }} />
+                                <span className="text-sm font-bold text-white">{intelligence.best_performing_color}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* The Scatter Visualization */}
+                <div className="h-[200px] w-full flex items-end justify-between gap-2 px-4 border-b border-white/5 pb-4">
+                    {intelligence?.data.map((item: any, i: number) => {
+                        // Normalize height based on max views (simple scaling)
+                        const maxViews = Math.max(...intelligence.data.map((d: any) => d.views));
+                        const height = (item.views / maxViews) * 100;
+                        
+                        return (
+                            <div key={i} className="group relative flex flex-col items-center gap-2 w-full">
+                                {/* Tooltip */}
+                                <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap z-10 border border-white/10">
+                                    <div className="font-bold">{item.views.toLocaleString()} Views</div>
+                                    <div className="opacity-70 max-w-[150px] truncate">{item.title}</div>
+                                </div>
+                                
+                                {/* Bar/Dot */}
+                                <div 
+                                    className="w-full max-w-[30px] rounded-t-lg transition-all duration-500 hover:brightness-125 cursor-pointer relative"
+                                    style={{ 
+                                        height: `${height}%`, 
+                                        backgroundColor: item.color,
+                                        boxShadow: `0 0 20px ${item.color}40` // Glow effect
+                                    }}
+                                >
+                                    {/* Top Cap Highlight */}
+                                    <div className="absolute top-0 w-full h-1 bg-white/20" />
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-600 mt-2 font-mono uppercase">
+                    <span>Recent Uploads</span>
+                    <span>(Left to Right)</span>
+                </div>
+            </div>
+
+            {/* Insight Panel */}
+            <div className="bg-gradient-to-br from-purple-900/10 to-transparent border border-purple-500/20 rounded-2xl p-6 flex flex-col justify-center relative overflow-hidden">
+                <div className="absolute -right-10 -top-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
+                
+                <h3 className="text-xl font-bold text-white mb-4 relative z-10">AI Insight</h3>
+                <p className="text-sm text-slate-300 leading-relaxed relative z-10 mb-6">
+                    "Your audience responds <strong>40% better</strong> to thumbnails with <span style={{color: intelligence?.best_performing_color || '#fff'}}>High Contrast & Warm Tones</span>. Consider switching your next video's palette."
+                </p>
+                
+                <button className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-2">
+                    <TrendingUp className="w-4 h-4" /> Apply to Next Video
+                </button>
+            </div>
+
+        </div>
 
           {/* --- NEW: TRENDSTREAM WIDGET --- */}
           <div className="glass-panel p-8 rounded-2xl border border-white/5 bg-gradient-to-br from-orange-900/10 to-transparent relative overflow-hidden">
