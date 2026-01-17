@@ -159,7 +159,7 @@ async def get_analytics_intelligence(email: str):
         return{
             "status": "success",
             "analysis": {
-                "best_performing_color": data[0]['color'],
+                "best_performing_color": data_points[0]['color'],
                 "data": data_points
             }
         }
