@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Users, Eye, Video, Activity, ExternalLink, 
   Loader2, LogOut, Wand2, X, Image as ImageIcon, 
   Instagram, Flame, ArrowRight, Target, RefreshCw, PieChart,
-  TrendingUp, Palette} from "lucide-react";
+  TrendingUp, Palette, Linkedin // Imported Linkedin
+} from "lucide-react";
 
 function DashboardContent() {
   const { user } = useUser();
@@ -30,6 +31,10 @@ function DashboardContent() {
   const [instaStats, setInstaStats] = useState<any>(null);
   const [instaId, setInstaId] = useState<string | null>(null);
 
+  // --- LINKEDIN STATE (NEW) ---
+  const [linkedinStats, setLinkedinStats] = useState<any>(null);
+  const [linkedinId, setLinkedinId] = useState<string | null>(null);
+
   // --- TRENDSTREAM STATE ---
   const [niche, setNiche] = useState("");
   const [trends, setTrends] = useState<any[]>([]);
@@ -42,8 +47,9 @@ function DashboardContent() {
   // Define API URL globally
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
-  // 1. INSTAGRAM AUTH CHECK
+  // 1. AUTH CALLBACK CHECK (Insta & LinkedIn)
   useEffect(() => {
+    // Instagram Check
     const urlInstaId = searchParams.get('instagram_id');
     if (urlInstaId) {
         setInstaId(urlInstaId);
@@ -53,12 +59,36 @@ function DashboardContent() {
         const stored = localStorage.getItem('insta_id');
         if (stored) setInstaId(stored);
     }
+
+    // LinkedIn Check (NEW)
+    // Note: Ensure your backend callback redirects with &linkedin_id=... if you need specific ID fetching
+    const status = searchParams.get('status');
+    const provider = searchParams.get('provider');
+    const urlLinkedinId = searchParams.get('linkedin_id'); // Optional if backend sends it
+
+    if (status === 'connected' && provider === 'linkedin') {
+        // If the backend sends an ID, store it. Otherwise, we just mark as connected for this session.
+        if (urlLinkedinId) {
+            setLinkedinId(urlLinkedinId);
+            localStorage.setItem('linkedin_id', urlLinkedinId);
+        } else {
+            // Fallback: If no ID returned, we might just assume connected or retry fetch
+            // For now, we'll try to fetch with a placeholder or email if backend supports it
+             localStorage.setItem('linkedin_connected', 'true');
+        }
+        alert("LinkedIn Connected Successfully!");
+        router.replace('/dashboard');
+    } else {
+        const storedLi = localStorage.getItem('linkedin_id');
+        if (storedLi) setLinkedinId(storedLi);
+    }
   }, [searchParams, router]);
 
-  // 2. FETCH INSTAGRAM STATS
+  // 2. FETCH SOCIAL STATS
   useEffect(() => {
     if (instaId) fetchInstaStats();
-  }, [instaId]);
+    if (linkedinId) fetchLinkedinStats();
+  }, [instaId, linkedinId]);
 
   const fetchInstaStats = async () => {
     try {
@@ -71,10 +101,32 @@ function DashboardContent() {
     }
   };
 
+  const fetchLinkedinStats = async () => {
+      try {
+          const res = await fetch(`${apiUrl}/api/analytics/linkedin?linkedin_id=${linkedinId}`);
+          if (res.ok) {
+              setLinkedinStats(await res.json());
+          }
+      } catch (e) {
+          console.error("LinkedIn Fetch Error", e);
+      }
+  };
+
   const handleInstaDisconnect = () => {
       localStorage.removeItem('insta_id');
       setInstaStats(null);
       setInstaId(null);
+  };
+
+  const handleLinkedinDisconnect = () => {
+      localStorage.removeItem('linkedin_id');
+      localStorage.removeItem('linkedin_connected');
+      setLinkedinStats(null);
+      setLinkedinId(null);
+  };
+
+  const handleConnectLinkedIn = () => {
+      window.location.href = `${apiUrl}/auth/linkedin/login`;
   };
 
   // 3. YOUTUBE AUTH CHECK
@@ -121,21 +173,20 @@ function DashboardContent() {
 
   const fetchIntelligence = async () => {
       try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analytics/intelligence?email=${user?.primaryEmailAddress?.emailAddress}`);
+          const res = await fetch(`${apiUrl}/api/analytics/intelligence?email=${user?.primaryEmailAddress?.emailAddress}`);
           const data = await res.json();
           setIntelligence(data.analysis);
       } catch (e) { console.error(e); }
   };
 
   const checkNiche = async () => {
-      // We assume /user/credits endpoint (or a new /user/profile endpoint) returns the niche
-      // For now, let's just assume we prompt them if trends are empty
+      // Logic to check if niche is set
   };
 
   const handleSetNiche = async () => {
       if (!niche || !user?.primaryEmailAddress?.emailAddress) return;
       try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/trends/set-niche`, {
+          await fetch(`${apiUrl}/api/trends/set-niche`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: user.primaryEmailAddress.emailAddress, niche })
@@ -149,7 +200,7 @@ function DashboardContent() {
       if (!user?.primaryEmailAddress?.emailAddress) return;
       setLoadingTrends(true);
       try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/trends/generate`, {
+          const res = await fetch(`${apiUrl}/api/trends/generate`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: user.primaryEmailAddress.emailAddress })
@@ -161,7 +212,6 @@ function DashboardContent() {
   };
 
   const handleUseTrend = (title: string) => {
-      // Redirect to Writer with the prompt
       router.push(`/writer?prompt=${encodeURIComponent(title)}`);
   };
 
@@ -263,20 +313,39 @@ function DashboardContent() {
           <p className="text-slate-400 mt-1">Live analytics from {stats?.channel_name || 'YouTube'}</p>
         </div>
         
-        {email && (
-           stats ? (
-             <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full hover:bg-orange-500/10 transition-colors group border border-white/5 hover:border-orange-500/30">
-                <span className="text-sm font-medium text-white group-hover:text-orange-400 transition-colors">{stats.channel_name}</span>
-                <img src={stats.thumbnail} alt="Channel" className="w-8 h-8 rounded-full ring-2 ring-transparent group-hover:ring-orange-500/50 transition-all" />
-                <LogOut className="w-4 h-4 text-slate-500 group-hover:text-orange-500 transition-colors" />
-             </button>
-           ) : (
-             <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors">
-                <LogOut className="w-4 h-4" />
-                <span>Disconnect</span>
-             </button>
-           )
-        )}
+        <div className="flex items-center gap-3">
+            {/* LinkedIn Connect Button (NEW) */}
+            {!linkedinStats ? (
+                 <button 
+                    onClick={handleConnectLinkedIn}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-400 rounded-lg hover:bg-blue-600 hover:text-white transition-colors border border-blue-600/20"
+                 >
+                    <Linkedin className="w-4 h-4" />
+                    <span>Connect LinkedIn</span>
+                 </button>
+            ) : (
+                <button onClick={handleLinkedinDisconnect} className="flex items-center gap-2 px-4 py-2 bg-white/5 text-slate-400 rounded-lg hover:text-white transition-colors border border-white/5">
+                    <Linkedin className="w-4 h-4" />
+                    <span>{linkedinStats.profile?.name || 'LinkedIn'}</span>
+                </button>
+            )}
+
+            {/* YouTube Disconnect */}
+            {email && (
+            stats ? (
+                <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full hover:bg-orange-500/10 transition-colors group border border-white/5 hover:border-orange-500/30">
+                    <span className="text-sm font-medium text-white group-hover:text-orange-400 transition-colors">{stats.channel_name}</span>
+                    <img src={stats.thumbnail} alt="Channel" className="w-8 h-8 rounded-full ring-2 ring-transparent group-hover:ring-orange-500/50 transition-all" />
+                    <LogOut className="w-4 h-4 text-slate-500 group-hover:text-orange-500 transition-colors" />
+                </button>
+            ) : (
+                <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors">
+                    <LogOut className="w-4 h-4" />
+                    <span>Disconnect</span>
+                </button>
+            )
+            )}
+        </div>
       </div>
 
       {loading && !stats ? (
@@ -284,14 +353,32 @@ function DashboardContent() {
       ) : (
         <>
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard icon={<Users className="text-cyan-400" />} label="Subscribers" value={parseInt(stats?.subscribers || '0').toLocaleString()} />
             <StatCard icon={<Eye className="text-blue-400" />} label="Total Views" value={parseInt(stats?.views || '0').toLocaleString()} />
             <StatCard icon={<Video className="text-orange-400" />} label="Total Videos" value={stats?.video_count || '0'} />
+            
+            {/* LinkedIn Card (NEW) */}
+            <div className="glass-panel p-6 rounded-xl border border-white/5 flex items-center gap-5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all group relative overflow-hidden">
+                <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Linkedin className="text-blue-400 w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">LinkedIn Network</p>
+                    <h4 className="text-3xl font-bold text-white mt-1 group-hover:text-blue-100 transition-colors">
+                        {linkedinStats ? "Active" : "--"}
+                    </h4>
+                </div>
+                {!linkedinStats && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={handleConnectLinkedIn} className="text-xs font-bold text-white bg-blue-600 px-3 py-1 rounded-full">Connect</button>
+                    </div>
+                )}
+            </div>
           </div>
 
-            {/* --- DATA MOAT: PSYCHOGRAPHICS --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* --- DATA MOAT: PSYCHOGRAPHICS --- */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Chart Area */}
             <div className="lg:col-span-2 bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden">
@@ -317,28 +404,23 @@ function DashboardContent() {
                 {/* The Scatter Visualization */}
                 <div className="h-[200px] w-full flex items-end justify-between gap-2 px-4 border-b border-white/5 pb-4">
                     {intelligence?.data.map((item: any, i: number) => {
-                        // Normalize height based on max views (simple scaling)
                         const maxViews = Math.max(...intelligence.data.map((d: any) => d.views));
                         const height = (item.views / maxViews) * 100;
                         
                         return (
                             <div key={i} className="group relative flex flex-col items-center gap-2 w-full">
-                                {/* Tooltip */}
                                 <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap z-10 border border-white/10">
                                     <div className="font-bold">{item.views.toLocaleString()} Views</div>
                                     <div className="opacity-70 max-w-[150px] truncate">{item.title}</div>
                                 </div>
-                                
-                                {/* Bar/Dot */}
                                 <div 
                                     className="w-full max-w-[30px] rounded-t-lg transition-all duration-500 hover:brightness-125 cursor-pointer relative"
                                     style={{ 
                                         height: `${height}%`, 
                                         backgroundColor: item.color,
-                                        boxShadow: `0 0 20px ${item.color}40` // Glow effect
+                                        boxShadow: `0 0 20px ${item.color}40` 
                                     }}
                                 >
-                                    {/* Top Cap Highlight */}
                                     <div className="absolute top-0 w-full h-1 bg-white/20" />
                                 </div>
                             </div>
@@ -367,7 +449,7 @@ function DashboardContent() {
 
         </div>
 
-          {/* --- NEW: TRENDSTREAM WIDGET --- */}
+          {/* --- TRENDSTREAM WIDGET --- */}
           <div className="glass-panel p-8 rounded-2xl border border-white/5 bg-gradient-to-br from-orange-900/10 to-transparent relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                   <Flame className="w-32 h-32 text-orange-500" />
