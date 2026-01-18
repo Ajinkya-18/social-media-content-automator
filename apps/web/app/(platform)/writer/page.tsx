@@ -1,5 +1,5 @@
 "use client";
-
+import { useCredits } from "../../components/CreditsContext";
 import { useState, useEffect, Suspense } from "react";
 import { PenTool, Loader2, Wand2, Copy, Check, Save, FileEdit, Video, Coins } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
@@ -7,6 +7,7 @@ import AfterGlowToast from '../../components/AfterGlowToast';
 import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
 
 function WriterContent() {
+  const { refreshCredits } = useCredits();
   const searchParams = useSearchParams();
   const router = useRouter(); // Initialize Router
   const { user } = useUser();
@@ -44,6 +45,7 @@ function WriterContent() {
         const data = await res.json();
         if (res.ok) {
             setOutput(data.script);
+            await refreshCredits();
         } else {
             alert("Generation failed. Please try again.");
         }

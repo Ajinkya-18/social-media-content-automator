@@ -1,32 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { Coins, Crown, Zap, Shield } from "lucide-react";
+import { useCredits } from "./CreditsContext"; // Import hook
 
 export default function CreditsDisplay() {
-  const { user } = useUser();
-  const [credits, setCredits] = useState<number | null>(null);
-  const [tier, setTier] = useState<string>("free");
+  // Use the shared state
+  const { credits, tier } = useCredits();
 
-  useEffect(() => {
-    if (user?.primaryEmailAddress?.emailAddress) {
-      fetchCredits();
-    }
-  }, [user]);
-
-  const fetchCredits = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/credits?email=${user?.primaryEmailAddress?.emailAddress}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCredits(data.credits_balance);
-        setTier(data.subscription_tier);
-      }
-    } catch (e) { console.error(e); }
-  };
-
-  if (credits === null) return null;
+  if (credits === null) return null; // or a loading skeleton
 
   return (
     <div className="flex items-center gap-3 bg-[#0b1121] border border-white/10 px-3 py-1.5 rounded-full shadow-lg ml-4">

@@ -1,5 +1,5 @@
 "use client";
-
+import { useCredits } from "../../components/CreditsContext";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import AfterGlowToast from '../../components/AfterGlowToast';
@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'; // Added
 import { Eye, Loader2, Image as ImageIcon, Download, Sparkles, Wand2, Layers, Save, LayoutDashboard, Coins } from "lucide-react";
 
 export default function VisualizerPage() {
+  const { refreshCredits } = useCredits();
   const router = useRouter(); // Added
   const { user } = useUser();
   const [prompt, setPrompt] = useState("");
@@ -29,7 +30,7 @@ export default function VisualizerPage() {
           body: JSON.stringify({ email: user.primaryEmailAddress.emailAddress, prompt: prompt, aspect_ratio: aspectRatio })
       });
       const data = await res.json();
-      if (res.ok && data.imageUrl) { setResult(data.imageUrl); } else { alert("Generation failed."); }
+      if (res.ok && data.imageUrl) { setResult(data.imageUrl); await refreshCredits();} else { alert("Generation failed."); }
     } catch (error) { console.error(error); alert("Error generating image."); } finally { setLoading(false); }
   };
 

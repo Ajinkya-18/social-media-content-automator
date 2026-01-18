@@ -1,11 +1,12 @@
 "use client";
-
+import { useCredits } from "../../components/CreditsContext";
 import { useState, useEffect, Suspense } from "react"; // Added Suspense
 import { useUser } from "@clerk/nextjs";
 import { Video, Loader2, Sparkles, Download, Play, AlertCircle, Coins } from "lucide-react";
 import { useSearchParams } from 'next/navigation'; // Added
 
 function VideoContent() {
+  const { refreshCredits } = useCredits();
   const searchParams = useSearchParams(); // Added
   const { user } = useUser();
   const [prompt, setPrompt] = useState("");
@@ -38,6 +39,7 @@ function VideoContent() {
       const data = await res.json();
       if (res.ok) {
         setVideoUrl(data.video_url);
+        await refreshCredits();
       } else {
         alert("Generation failed: " + (data.detail || "Unknown error"));
       }

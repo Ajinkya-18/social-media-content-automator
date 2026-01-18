@@ -1,5 +1,5 @@
 "use client";
-
+import { useCredits } from "../../components/CreditsContext";
 import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 export default function RepurposerPage() {
+  const { refreshCredits } = useCredits();
   const router = useRouter();
   const { user } = useUser();
   const [inputContent, setInputContent] = useState("");
@@ -78,6 +79,9 @@ export default function RepurposerPage() {
       if (!res.ok) throw new Error("Processing failed");
       const data = await res.json();
       setResults({ twitter: data.twitter, linkedin: data.linkedin, instagram: data.instagram });
+      
+      await refreshCredits();
+      
     } catch (error) { console.error(error); alert("AI Processing failed."); } 
     finally { setIsLoading(false); }
   };

@@ -6,6 +6,8 @@ import { dark } from "@clerk/themes";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Providers from "./providers";
+import { CreditsProvider } from "./components/CreditsContext";
+
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,7 +33,7 @@ export default function RootLayout({
     >
       <html lang="en">
         <body className={`${inter.className} bg-[#030712] text-white flex flex-col min-h-screen selection:bg-orange-500/30 selection:text-orange-200`}>
-          
+        <CreditsProvider>          
           <Providers>
             {/* Fixed Navbar with Z-Index */}
             <Navbar />
@@ -43,7 +45,7 @@ export default function RootLayout({
 
             <Footer />
           </Providers>
-
+        </CreditsProvider>
         </body>
       </html>
     </ClerkProvider>
