@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from PIL import Image
 from collections import Counter
 from auth import SCOPES
+from auth import LINKEDIN_SCOPES
 
 load_dotenv()
 
@@ -178,3 +179,40 @@ async def get_analytics_intelligence(email: str):
                 ]
             }
         }
+
+@router.get("/api/analytics/linkedin")
+async def get_linkedin_stats(linkedin_id: str):
+    try:
+        response = supabase.table("social_tokens").select("access_token")\
+            .eq("user_email", f"linkedin_{linkedin_id}")\
+                .eq("provider", "linkedin").execute()
+
+        if not response.data:
+            raise HTTPException(401, "LinkedIn not connected")
+
+        token = response.data[0]['access_token']
+        headers = {"Authorization": f"Bearer {token}"}
+
+        user_info = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers).json()
+
+        return {
+            "status": "success",
+            "profile": {
+                "name": f"{user_info.get('given_name')} {user_info.get('family_name')}",
+                "picture": user_info.get("picture"),
+                "email": user_info.get("email")
+            },
+            "engagement_history": [
+                {"day": "Mon", "views": 120, "likes": 45},
+                {"day": "Tue", "views": 230, "likes": 89},
+                {"day": "Wed", "views": 180, "likes": 60},
+                {"day": "Thu", "views": 450, "likes": 120},
+                {"day": "Fri", "views": 320, "likes": 95},
+            ],
+            "top_performing_post": "The Future of AI in B2B Marketing..."
+        }
+
+    except Exception as e:
+        print(f"LinkedIn Analytics Error: {e}")
+        raise HTTPException(500, str(e))
+    

@@ -21,6 +21,7 @@ from supabase import create_client, Client
 from vault import router as vault_router
 import time
 from huggingface_hub import InferenceClient
+from auth import LINKEDIN_SCOPES
 
 
 load_dotenv()
@@ -482,4 +483,57 @@ async def generate_trends(req: IdeaRequest):
     except Exception as e:
         print(f"Trend Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class LinkedInPostRequest(BaseModel):
+    linkedin_id: str
+    text: str
+
+@app.post("/api/linkedin/post")
+async def post_to_linkedin(payload: LinkedInPostRequest):
+    try:
+        res = supabase.table("social_tokens").select("access_token")\
+            .eq("user_email", f"linkedin_{payload.linkedin_id}")\
+                .execute()
+            
+        if not res.data:
+            raise HTTPException(401, "LinkedIn not connected")
+        
+        token = res.data[0]['access_token']
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+
+        post_data = {
+            "author": f"urn:li:person:{payload.linkedin_id}",
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {
+                        "text": payload.text
+                    },
+                    "shareMediaCategory": "NONE"
+                }
+            },
+            "visibility": {
+                "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+            }
+        }
+
+        response = requests.post(
+            "https://api.linkedin.com/v2/ugcPosts",
+            headers=headers,
+            json=post_data
+        )
+
+        if response.status_code != 201:
+            raise HTTPException(400, f"LinkedIn Error: {response.text}")
+
+        return {"status": "success", "post_id": response.json().get("id")}
+
+    except Exception as e:
+        print(f"Posting Error: {e}")
+        raise HTTPException(500, str(e))
 

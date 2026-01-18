@@ -19,7 +19,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import stripe
 import razorpay
-# import supabase
+from supabase import Client, create_client
+
 
 
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
@@ -46,6 +47,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
     "openid"
 ]
+
+LINKEDIN_SCOPES = ["openid", "profile", "email", "w_member_social"]
 
 def generate_pkce_pair():
     code_verifier = secrets.token_urlsafe(64)
@@ -604,7 +607,6 @@ async def get_calendar_events(email: str):
         print(f"Calendar Fetch Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.post("/calendar/create")
 async def create_calendar_event(payload: CalendarEvent):
     try:
@@ -963,4 +965,78 @@ async def mark_calendar_event_complete(payload: UpdateEventStatusRequest):
         print(f"Calendar Update Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/auth/linkedin/login")
+async def login_linkedin():
+    client_id = os.getenv("LINKEDIN_CLIENT_ID")
+    redirect_uri = os.getenv("LINKEDIN_REDIRECT_URI")
+    state = secrets.token_urlsafe(16)
+
+    scope_string = "%20".join(LINKEDIN_SCOPES)
+
+    auth_url = (
+        f"https://www.linkedin.com/oauth/v2/authorization?"
+        f"response_type=code&"
+        f"client_id={client_id}&"
+        f"redirect_uri={redirect_uri}&"
+        f"state={state}&"
+        f"scope={scope_string}"
+    )
+
+    return RedirectResponse(auth_url)
+
+@router.get("/auth/linkedin/callback")
+async def callback_linkedin(request: Request):
+    code = request.query_params.get("code")
+
+    if not code:
+        raise HTTPException(400, "Authorization code missing")
+
+    try:
+        token_url = "https://www.linkedin.com/oauth/v2/accessToken"
+        data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": os.getenv("LINKEDIN_REDIRECT_URI"),
+            "client_id": os.getenv("LINKEDIN_CLIENT_ID"),
+            "client_secret": os.getenv("LINKEDIN_CLIENT_SECRET")
+        }
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+
+        token_res = requests.post(token_url, data=data, headers=headers).json()
+
+        access_token = token_res.get("access_token")
+
+        if not access_token:
+            raise HTTPException(400, f"Failed to retrieve LinkedIn token: {token_res}")
+
+        profile_res = requests.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}
+        ).json()
+
+        linkedin_urn = profile_res.get("sub")
+        email = profile_res.get("email")
+
+        db_data = {
+            "user_email": f"linkedin_{linkedin_urn}", # Unique ID for this provider
+            "provider": "linkedin",
+            "access_token": access_token,
+            "refresh_token": token_res.get("refresh_token"), 
+            "updated_at": "now()"
+        }
+
+        supabase.table("social_tokens").upsert(db_data).execute()
+
+        frontend_url = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
+
+        return RedirectResponse(
+            f"{frontend_url}/dashboard?status=connected&provider=linkedin"
+        )
+
+    except Exception as e:
+        print(f"LinkedIn Auth Error: {e}")
+        raise HTTPException(500, str(e))
 
