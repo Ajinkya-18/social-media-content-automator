@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from 'next/navigation';
 import { 
   Layers, Twitter, Linkedin, Instagram, Copy, Repeat, Loader2, 
-  Sparkles, CalendarPlus, Check, Upload, PenTool, Send, ChevronDown, Building2, User 
+  Sparkles, CalendarPlus, Check, Upload, PenTool, Send, ChevronDown, Building2, User, Coins 
 } from "lucide-react";
 
 export default function RepurposerPage() {
@@ -23,7 +23,7 @@ export default function RepurposerPage() {
   
   // --- LINKEDIN SWITCHER STATE ---
   const [companies, setCompanies] = useState<any[]>([]);
-  const [selectedAuthor, setSelectedAuthor] = useState<string>(""); // "" = Personal, otherwise URN
+  const [selectedAuthor, setSelectedAuthor] = useState<string>(""); 
   const [selectedAuthorName, setSelectedAuthorName] = useState<string>("Personal Profile");
   const [showAuthorMenu, setShowAuthorMenu] = useState(false);
   
@@ -36,7 +36,7 @@ export default function RepurposerPage() {
   const [copySuccess, setCopySuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // FETCH COMPANIES WHEN LINKEDIN TAB IS ACTIVE
+  // FETCH COMPANIES
   useEffect(() => {
       if (activeTab === 'linkedin') {
           const linkedinId = localStorage.getItem('linkedin_id');
@@ -97,14 +97,12 @@ export default function RepurposerPage() {
     } catch (e) { console.error(e); } finally { setIsScheduling(false); }
   };
 
-  // --- BRIDGE: SEND TO WRITER ---
   const handleToWriter = () => {
       const content = results[activeTab as keyof typeof results];
       if (!content) return;
       router.push(`/writer?prompt=${encodeURIComponent("Expand this into a full script: " + content)}`);
   };
 
-  // --- DIRECT POSTING FUNCTION ---
   const handlePostToLinkedIn = async () => {
       const content = results['linkedin'];
       if (!content) return;
@@ -117,8 +115,6 @@ export default function RepurposerPage() {
       }
 
       setIsPosting(true);
-      
-      // Use selected author URN or default to personal
       const finalAuthorUrn = selectedAuthor || `urn:li:person:${linkedinId}`;
 
       try {
@@ -175,14 +171,21 @@ export default function RepurposerPage() {
                 </div>
             </div>
             <textarea value={inputContent} onChange={(e) => setInputContent(e.target.value)} placeholder="Paste your script here OR upload a .docx/.txt file..." className="flex-1 bg-[#0b1121] border border-white/10 rounded-2xl p-6 text-slate-300 focus:border-purple-500 outline-none resize-none font-mono text-sm leading-relaxed custom-scrollbar transition-all" />
-            <button onClick={handleRemix} disabled={isLoading || !inputContent} className="py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-bold shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 group">
-                {isLoading ? <><Loader2 className="animate-spin w-5 h-5" /> Transmuting...</> : <><Repeat className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" /> Generate 3 Variations</>}
-            </button>
+            
+            {/* GENERATE BUTTON WITH COST */}
+            <div className="flex flex-col gap-2">
+                <button onClick={handleRemix} disabled={isLoading || !inputContent} className="py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-bold shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 group">
+                    {isLoading ? <><Loader2 className="animate-spin w-5 h-5" /> Transmuting...</> : <><Repeat className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" /> Generate 3 Variations</>}
+                </button>
+                <div className="flex justify-center items-center gap-1.5 text-[10px] text-slate-500 font-mono uppercase tracking-widest">
+                    <Coins className="w-3 h-3 text-orange-400" /> 
+                    Cost: <span className="text-orange-400 font-bold">5 Credits</span> per run
+                </div>
+            </div>
         </div>
 
-        {/* OUTPUT COLUMN */}
+        {/* OUTPUT COLUMN (Same as before) */}
         <div className="bg-[#0b1121] border border-white/10 rounded-2xl flex flex-col overflow-hidden h-full shadow-2xl">
-            {/* Tabs */}
             <div className="flex border-b border-white/5 bg-black/20">
                 {[{ id: 'twitter', icon: Twitter, label: 'Twitter' }, { id: 'linkedin', icon: Linkedin, label: 'LinkedIn' }, { id: 'instagram', icon: Instagram, label: 'Instagram' }].map((tab) => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 py-4 flex items-center justify-center gap-2 text-sm font-bold transition-all border-b-2 ${activeTab === tab.id ? `border-purple-500 bg-white/5 text-white` : 'border-transparent text-slate-500 hover:text-white hover:bg-white/5'}`}>
@@ -191,12 +194,10 @@ export default function RepurposerPage() {
                 ))}
             </div>
 
-            {/* Content Area */}
             <div className="flex-1 p-6 overflow-y-auto custom-scrollbar relative bg-[#0b1121]">
                 {results[activeTab as keyof typeof results] ? <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap font-sans text-slate-300 leading-relaxed">{results[activeTab as keyof typeof results]}</div> : <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50"><Layers className="w-12 h-12 mb-4" /><p className="text-sm">AI Output will appear here</p></div>}
             </div>
 
-            {/* Actions Footer */}
             <div className="p-4 border-t border-white/5 bg-black/20 flex justify-between items-center">
                 <span className="text-xs text-slate-500 font-mono">{results[activeTab as keyof typeof results] ? `${results[activeTab as keyof typeof results].length} chars` : '0 chars'}</span>
                 
@@ -205,7 +206,6 @@ export default function RepurposerPage() {
                         {copySuccess ? "Copied!" : <><Copy className="w-3 h-3" /> Copy</>}
                     </button>
                     
-                    {/* NEW: LinkedIn Account Switcher */}
                     {activeTab === 'linkedin' && (
                         <div className="relative">
                             <button 
@@ -217,7 +217,6 @@ export default function RepurposerPage() {
                                 <ChevronDown className="w-3 h-3" />
                             </button>
 
-                            {/* Dropdown Menu */}
                             {showAuthorMenu && (
                                 <div className="absolute bottom-full mb-2 right-0 w-48 bg-[#0b1121] border border-white/10 rounded-xl shadow-xl overflow-hidden z-20">
                                     <div className="p-2 border-b border-white/5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">Post as...</div>
@@ -241,7 +240,6 @@ export default function RepurposerPage() {
                         </div>
                     )}
 
-                    {/* NEW: LinkedIn Post Button */}
                     {activeTab === 'linkedin' && (
                         <button 
                             onClick={handlePostToLinkedIn}
@@ -253,7 +251,6 @@ export default function RepurposerPage() {
                         </button>
                     )}
 
-                    {/* Schedule Button */}
                     {activeTab !== 'linkedin' && (
                         <button onClick={handleSchedule} disabled={isScheduling || !results[activeTab as keyof typeof results]} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${scheduleSuccess ? "bg-green-500/20 text-green-400 border border-green-500/50" : "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/50"} disabled:opacity-50`}>
                             {isScheduling ? <Loader2 className="w-3 h-3 animate-spin" /> : scheduleSuccess ? <Check className="w-3 h-3" /> : <CalendarPlus className="w-3 h-3" />}

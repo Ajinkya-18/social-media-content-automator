@@ -22,9 +22,19 @@ from vault import router as vault_router
 import time
 from huggingface_hub import InferenceClient
 from auth import LINKEDIN_SCOPES
+import google.generativeai as genai
 
 
 load_dotenv()
+
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+CREDIT_COSTS = {
+    "script": 10,
+    "repurpose": 5,
+    "image": 15,
+    "video": 20
+}
 
 supabase: Client = create_client(
     os.getenv("SUPABASE_URL"),
@@ -42,6 +52,7 @@ SCOPES = [
 ]
 
 groq_api_key = os.getenv("GROQ_API_KEY")
+
 client = Groq(
     api_key=groq_api_key,
 )
@@ -88,34 +99,54 @@ class GenerateScriptRequest(BaseModel):
 @app.post("/api/generate-script")
 async def generate_script(req: GenerateScriptRequest):
     try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional scriptwriter. Generate a clear, formatted script based on the user's request."
-                },
-                {
-                    "role": "user",
-                    "content": f"Write a script for: {req.prompt}. Keep the tone {req.tone}.",
-                }
-            ],
-            model="llama-3.3-70b-versatile",
-        )
+        tier = await process_credits(req.email, CREDIT_COSTS["script"])
 
-        generated_text = chat_completion.choices[0].message.content
+        model_name = "llama-3.1-8b-instant"
+
+        if tier == "standard": model_name = "llama-3.3-70b-versatile"
+        if tier == "pro": model_name = "gemini-3-flash-preview"
+
+        content = ""
+        print(f"Generating script using {model_name} for {tier} user...")
+
+        if "gemini" in model_name:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(f"You are a pro scriptwriter. Write a script for: {req.prompt}. Tone: {req.tone}.")
+            content = response.text
+
+        else:
+            chat = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a professional scriptwriter. Generate a clear, formatted script based on the user's request."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Write a script for: {req.prompt}. Keep the tone {req.tone}.",
+                    }
+                ],
+                model=model_name,
+            )
+
+            content = chat.choices[0].message.content
 
         if req.email:
             supabase.table("assets").insert({
                 "user_email": req.email,
                 "asset_type": "script",
-                "content": generated_text,
-                "metadata": {"prompt": req.prompt, "tone": req.tone}
+                "content": content,
+                "metadata": {"model": model_name, "cost": CREDIT_COSTS["script"]}
             }).execute()
 
-        return {"script": generated_text}
+        return {"script": content}
+
+    except HTTPException as he:
+        raise he
 
     except Exception as e:
-        print(f"Groq Error: {str(e)}")
+        # Refund on failure (Optional but recommended)
+        # For simplicity, we skip refund logic here, but in prod you should add it.
         raise HTTPException(status_code=500, detail=f"AI Generation Failed: {str(e)}")
         
 @app.post("/save-script")
@@ -254,37 +285,43 @@ class RepurposeRequest(BaseModel):
 @app.post("/api/repurpose")
 async def repurpose_content(req: RepurposeRequest):
     try:
-        system_prompt = """
-        You are an expert Social Media Manager. 
-        Analyze the provided video script and repurpose it into three distinct formats.
+        tier = await process_credits(req.email, CREDIT_COSTS["repurpose"])
+
+        model_name = "llama-3.1-8b-instant"
+
+        if tier == "standard": 
+            model_name = "llama-3.3-70b-versatile"
+
+        if tier == "pro": 
+            model_name = "gemini-3-flash-preview"
         
-        Output MUST be valid JSON with the following structure:
-        {
-            "twitter": "A thread of 3-5 tweets. Separate tweets with double newlines.",
-            "linkedin": "A professional, storytelling-style post with bullet points.",
-            "instagram": "A catchy caption with emojis and 5-7 hashtags."
-        }
-        Do not add any text outside the JSON object.
-        """
+        content = ""
+        system_prompt = "You are an expert Social Media Manager. Return JSON only: {\"twitter\": \"...\", \"linkedin\": \"...\", \"instagram\": \"...\"}"
 
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": f"Script: {req.script}\n\nTone: {req.tone}",
-                }
-            ],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"}
-        )
+        if "gemini" in model_name:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(f"{system_prompt}\n\nTask: Repurpose this script:\n{req.script}\n\nTone: {req.tone}")
+            content = response.text.replace("```json", "").replace("```", "")
 
-        content = chat_completion.choices[0].message.content
+        else:
+            chat = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Script: {req.script}\n\nTone: {req.tone}",
+                    }
+                ],
+                model=model_name,
+                response_format={"type": "json_object"}
+            )
 
-        parsed_content = json.loads(content)
+            content = chat.choices[0].message.content
+
+        parsed = json.loads(content)
 
         if req.email:
             supabase.table("assets").insert({
@@ -294,7 +331,10 @@ async def repurpose_content(req: RepurposeRequest):
                 "metadata": {"source_length": len(req.script), "tone": req.tone}
             }).execute()
         
-        return parsed_content
+        return parsed
+
+    except HTTPException as he:
+        raise he
 
     except Exception as e:
         print(f"Repurposer Error: {str(e)}")
@@ -337,29 +377,26 @@ class ImageRequest(BaseModel):
 @app.post("/api/generate-image")
 async def generate_image(payload: ImageRequest):
     try:
+        tier = await process_credits(payload.email, CREDIT_COSTS["image"])
+
+        # 2. Select Model
+        # Free: Flux Schnell (HF)
+        # Standard: Playground v2.5 (HF) - Better artistic control
+        # Pro: Stable Diffusion 3.5 Large (HF) - Top tier
+
         model_id = "black-forest-labs/flux.1-schnell"
+
+        if tier == "standard": 
+            model_id = "playgroundai/playground-v2.5-1024px-aesthetic"
+        
+        elif tier == "pro":
+            model_id = "stabilityai/stable-diffusion-3.5-large"
+
+        print(f"Generating image via {model_id} for {tier} user...")
 
         width, height = 1024, 576
         if payload.aspect_ratio == "1:1": width, height = 1024, 1024
         if payload.aspect_ratio == "9:16": width, height = 576, 1024
-
-        print(f"Generating image via HF for {payload.email}...")
-
-        # output = replicate.run(
-        #     "black-forest-labs/flux-schnell",
-        #     input={
-        #         "prompt": payload.prompt,
-        #         "aspect_ratio": payload.aspect_ratio,
-        #         "output_format": "webp",
-        #         "output_quality": 90
-        #     }
-        # )
-
-        # if isinstance(output, list):
-        #     image_url = output[0].url if hasattr(output[0], 'url') else str(output[0])
-        
-        # else:
-        #     image_url = output.url if hasattr(output, 'url') else str(output)
 
         image = hf_client.text_to_image(
             payload.prompt,
@@ -378,13 +415,6 @@ async def generate_image(payload: ImageRequest):
 
         print(f"Uploading {filename} to Supabase Storage...")
 
-        # if payload.email:
-        #     supabase.table("assets").insert({
-        #         "user_email": payload.email,
-        #         "asset_type": "image",
-        #         "content": image_url,
-        #         "metadata": {"prompt": payload.prompt, "aspect_ratio": payload.aspect_ratio}
-        #     }).execute()
         supabase.storage.from_(bucket_name).upload(
             path=filename,
             file=img_bytes,
@@ -401,14 +431,16 @@ async def generate_image(payload: ImageRequest):
                 "metadata": {
                     "prompt": payload.prompt,
                     "aspect_ratio": payload.aspect_ratio,
-                    "model": "flux-schnell-hf",
-                    "storage_provider": "supabase",
+                    "model": model_id,
                     "filename": filename
                 }
             }).execute()
 
         return {"imageUrl": public_url}
 
+    except HTTPException as he:
+        raise he
+    
     except Exception as e:
         print(f"Image Gen Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -579,4 +611,22 @@ async def get_linkedin_companies(linkedin_id: str):
 
         return {"companies": []}
 
+async def process_credits(email: str, cost: int):
+    res = supabase.table("profiles").select("credits_balance, subscription_tier")\
+        .eq("user_email", email).execute()
+
+    if not res.data:
+        supabase.table("profiles").insert({"user_email": email, "credits_balance": 50, "subscription_tier": "free"}).execute()
+        return "free"
+
+    profile = res.data[0]
+
+    if profile['credits_balance'] < cost:
+        raise HTTPException(402, detail=f"Insufficient credits. Need {cost}, have {profile['credits_balance']}.")
+
+    new_balance = profile['credits_balance'] - cost
+    supabase.table("profiles").update({"credits_balance": new_balance})\
+        .eq("user_email", email).execute()
+
+    return profile['subscription_tier']
 

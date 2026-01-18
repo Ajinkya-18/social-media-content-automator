@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import AfterGlowToast from '../../components/AfterGlowToast';
 import { useRouter } from 'next/navigation'; // Added
-import { Eye, Loader2, Image as ImageIcon, Download, Sparkles, Wand2, Layers, Save, LayoutDashboard } from "lucide-react";
+import { Eye, Loader2, Image as ImageIcon, Download, Sparkles, Wand2, Layers, Save, LayoutDashboard, Coins } from "lucide-react";
 
 export default function VisualizerPage() {
   const router = useRouter(); // Added
@@ -72,6 +72,10 @@ export default function VisualizerPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
         <div className="lg:col-span-1 bg-[#0b1121] p-6 rounded-3xl border border-white/5 flex flex-col shadow-2xl relative overflow-hidden h-full">
             <form onSubmit={handleGenerate} className="space-y-6 relative z-10 flex-1 flex flex-col">
+                <div className="flex justify-center items-center gap-1.5 text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-3">
+                    <Coins className="w-3 h-3 text-cyan-400" /> 
+                    Cost: <span className="text-cyan-400 font-bold">15 Credits</span> per image
+                </div>
                 <div className="flex-1">
                     <label className="flex items-center gap-2 text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3"><Wand2 className="w-4 h-4" /> Vision Prompt</label>
                     <textarea required value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="A cyberpunk city..." className="w-full h-40 bg-black/40 border border-white/10 rounded-2xl p-4 text-white focus:border-cyan-500 outline-none resize-none transition-all text-sm" />

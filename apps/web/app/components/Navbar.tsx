@@ -3,6 +3,7 @@ import Link from "next/link";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { Sparkles } from "lucide-react";
+import CreditsDisplay from "./CreditsDisplay";
 
 export default function Navbar() {
   const { isLoaded, isSignedIn } = useUser();
@@ -44,10 +45,11 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
         ) : isSignedIn ? (
           <div className="flex items-center gap-4">
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
+            {/* <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
                 <Sparkles className="w-3 h-3 text-orange-400" />
                 <span className="text-xs font-bold text-orange-200">PRO</span>
-            </div>
+            </div> */}
+            <CreditsDisplay />
             <UserButton 
               appearance={{
                 elements: {

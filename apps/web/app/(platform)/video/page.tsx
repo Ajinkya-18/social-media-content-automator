@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"; // Added Suspense
 import { useUser } from "@clerk/nextjs";
-import { Video, Loader2, Sparkles, Download, Play, AlertCircle } from "lucide-react";
+import { Video, Loader2, Sparkles, Download, Play, AlertCircle, Coins } from "lucide-react";
 import { useSearchParams } from 'next/navigation'; // Added
 
 function VideoContent() {
@@ -66,6 +66,10 @@ function VideoContent() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch">
         <div className="bg-[#0b1121] p-8 rounded-3xl border border-white/5 flex flex-col shadow-2xl relative">
             <form onSubmit={handleGenerate} className="space-y-8 relative z-10 h-full flex flex-col">
+                <div className="flex justify-center items-center gap-1.5 text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-3">
+                    <Coins className="w-3 h-3 text-red-400" /> 
+                    Cost: <span className="text-red-400 font-bold">20 Credits</span> per video
+                </div>
                 <div className="flex-1">
                     <label className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-4 block">
                         Director's Prompt

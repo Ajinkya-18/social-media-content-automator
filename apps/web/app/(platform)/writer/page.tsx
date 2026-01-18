@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { PenTool, Loader2, Wand2, Copy, Check, Save, FileEdit, Video } from "lucide-react";
+import { PenTool, Loader2, Wand2, Copy, Check, Save, FileEdit, Video, Coins } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import AfterGlowToast from '../../components/AfterGlowToast';
 import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
@@ -120,6 +120,10 @@ function WriterContent() {
             <button onClick={handleGenerate} disabled={loading || !prompt} className="py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold shadow-[0_0_20px_rgba(8,145,178,0.3)] flex items-center justify-center gap-2 transition-all disabled:opacity-50">
                 {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <><Wand2 className="w-5 h-5" /> Generate Script</>}
             </button>
+            <div className="flex justify-center items-center gap-1.5 text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-2">
+                <Coins className="w-3 h-3 text-orange-400" /> 
+                Cost: <span className="text-orange-400 font-bold">10 Credits</span> per script
+            </div>
         </div>
 
         <div className="relative bg-[#0b1121] border border-white/10 rounded-2xl flex flex-col overflow-hidden group">
