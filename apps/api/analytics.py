@@ -122,6 +122,10 @@ async def get_analytics_intelligence(email: str):
         youtube = build('youtube', 'v3', credentials=creds)
 
         channels_res = youtube.channels().list(part="contentDetails", mine=True).execute()
+
+        if not channels_res.get("items"):
+            raise HTTPException(404, "No channel found")
+
         uploads_id = channels_res["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
         videos_res = youtube.playlistItems().list(
@@ -129,6 +133,15 @@ async def get_analytics_intelligence(email: str):
             playlistId=uploads_id,
             maxResults=10
         ).execute()
+
+        if not videos_res.get("items"):
+            return {
+                "status": "success", 
+                "analysis": {
+                    "best_performing_color": "#000000",
+                    "data": []
+                }
+            }
 
         video_ids = [item['snippet']['resourceId']['videoId'] for item in videos_res['items']]
 
@@ -142,8 +155,9 @@ async def get_analytics_intelligence(email: str):
         for i, item in enumerate(videos_res['items']):
             vid_id = item['snippet']['resourceId']['videoId']
             title = item['snippet']['title']
-            thumb_url = item['snippet']['thumbnails'].get('high', item['snippet']['thumbnails']['default'])['url']
-
+            thumb_dict = item['snippet']['thumbnails']
+            thumb_url = thumb_dict.get('high', thumb_dict.get('medium', thumb_dict.get('default', {}))).get('url', '')
+            
             stats = next((s for s in stats_res['items'] if s['id'] == vid_id), None)
             views = int(stats['statistics'].get('viewCount', 0)) if stats else 0
 
@@ -158,10 +172,12 @@ async def get_analytics_intelligence(email: str):
 
         data_points.sort(key=lambda x: x['views'], reverse=True)
 
+        best_color = data_points[0]['color'] if data_points else "#000000"
+
         return{
             "status": "success",
             "analysis": {
-                "best_performing_color": data_points[0]['color'],
+                "best_performing_color": best_color,
                 "data": data_points
             }
         }

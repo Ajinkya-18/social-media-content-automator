@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from 'next/navigation';
 import { 
   Layers, Twitter, Linkedin, Instagram, Copy, Repeat, Loader2, 
-  Sparkles, CalendarPlus, Check, Upload, PenTool, Send 
+  Sparkles, CalendarPlus, Check, Upload, PenTool, Send, ChevronDown, Building2, User 
 } from "lucide-react";
 
 export default function RepurposerPage() {
@@ -21,6 +21,12 @@ export default function RepurposerPage() {
 
   const [isPosting, setIsPosting] = useState(false);
   
+  // --- LINKEDIN SWITCHER STATE ---
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedAuthor, setSelectedAuthor] = useState<string>(""); // "" = Personal, otherwise URN
+  const [selectedAuthorName, setSelectedAuthorName] = useState<string>("Personal Profile");
+  const [showAuthorMenu, setShowAuthorMenu] = useState(false);
+  
   const [results, setResults] = useState({
     twitter: "",
     linkedin: "",
@@ -29,6 +35,21 @@ export default function RepurposerPage() {
   
   const [copySuccess, setCopySuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // FETCH COMPANIES WHEN LINKEDIN TAB IS ACTIVE
+  useEffect(() => {
+      if (activeTab === 'linkedin') {
+          const linkedinId = localStorage.getItem('linkedin_id');
+          if (linkedinId) {
+              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/linkedin/companies?linkedin_id=${linkedinId}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data.companies) setCompanies(data.companies);
+              })
+              .catch(err => console.error("Failed to fetch companies", err));
+          }
+      }
+  }, [activeTab]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,7 +109,6 @@ export default function RepurposerPage() {
       const content = results['linkedin'];
       if (!content) return;
       
-      // Attempt to retrieve ID from storage (set by Dashboard)
       const linkedinId = localStorage.getItem('linkedin_id');
       
       if (!linkedinId) {
@@ -98,12 +118,16 @@ export default function RepurposerPage() {
 
       setIsPosting(true);
       
+      // Use selected author URN or default to personal
+      const finalAuthorUrn = selectedAuthor || `urn:li:person:${linkedinId}`;
+
       try {
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/linkedin/post`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   linkedin_id: linkedinId,
+                  author_urn: finalAuthorUrn,
                   text: content
               })
           });
@@ -111,7 +135,7 @@ export default function RepurposerPage() {
           const data = await res.json();
 
           if (res.ok) {
-             alert("Posted to LinkedIn successfully! 🚀");
+             alert(`Posted to LinkedIn as ${selectedAuthorName} successfully! 🚀`);
           } else {
              alert(`Failed: ${data.detail || 'Unknown error'}`);
           }
@@ -176,15 +200,46 @@ export default function RepurposerPage() {
             <div className="p-4 border-t border-white/5 bg-black/20 flex justify-between items-center">
                 <span className="text-xs text-slate-500 font-mono">{results[activeTab as keyof typeof results] ? `${results[activeTab as keyof typeof results].length} chars` : '0 chars'}</span>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                     <button onClick={() => { navigator.clipboard.writeText(results[activeTab as keyof typeof results] || ""); setCopySuccess(true); setTimeout(() => setCopySuccess(false), 2000); }} disabled={!results[activeTab as keyof typeof results]} className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold flex items-center gap-2 disabled:opacity-50">
                         {copySuccess ? "Copied!" : <><Copy className="w-3 h-3" /> Copy</>}
                     </button>
                     
-                    {/* BRIDGE: To Writer */}
-                    <button onClick={handleToWriter} disabled={!results[activeTab as keyof typeof results]} className="px-4 py-2 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-xs font-bold flex items-center gap-2 border border-cyan-500/30 disabled:opacity-50">
-                        <PenTool className="w-3 h-3" /> To Writer
-                    </button>
+                    {/* NEW: LinkedIn Account Switcher */}
+                    {activeTab === 'linkedin' && (
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowAuthorMenu(!showAuthorMenu)}
+                                className="px-4 py-2 bg-blue-900/20 text-blue-400 hover:bg-blue-900/30 rounded-lg text-xs font-bold flex items-center gap-2 border border-blue-500/30 transition-all"
+                            >
+                                {selectedAuthor ? <Building2 className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                                <span className="max-w-[100px] truncate">{selectedAuthorName}</span>
+                                <ChevronDown className="w-3 h-3" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {showAuthorMenu && (
+                                <div className="absolute bottom-full mb-2 right-0 w-48 bg-[#0b1121] border border-white/10 rounded-xl shadow-xl overflow-hidden z-20">
+                                    <div className="p-2 border-b border-white/5 text-[10px] text-slate-500 font-bold uppercase tracking-wider">Post as...</div>
+                                    <button 
+                                        onClick={() => { setSelectedAuthor(""); setSelectedAuthorName("Personal Profile"); setShowAuthorMenu(false); }}
+                                        className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-white/5 flex items-center gap-2"
+                                    >
+                                        <User className="w-3 h-3 text-blue-400" /> Personal Profile
+                                    </button>
+                                    {companies.map(company => (
+                                        <button 
+                                            key={company.id}
+                                            onClick={() => { setSelectedAuthor(company.id); setSelectedAuthorName(company.name); setShowAuthorMenu(false); }}
+                                            className="w-full text-left px-4 py-2.5 text-xs text-white hover:bg-white/5 flex items-center gap-2"
+                                        >
+                                            <Building2 className="w-3 h-3 text-orange-400" /> {company.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* NEW: LinkedIn Post Button */}
                     {activeTab === 'linkedin' && (
@@ -199,10 +254,12 @@ export default function RepurposerPage() {
                     )}
 
                     {/* Schedule Button */}
-                    <button onClick={handleSchedule} disabled={isScheduling || !results[activeTab as keyof typeof results]} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${scheduleSuccess ? "bg-green-500/20 text-green-400 border border-green-500/50" : "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/50"} disabled:opacity-50`}>
-                        {isScheduling ? <Loader2 className="w-3 h-3 animate-spin" /> : scheduleSuccess ? <Check className="w-3 h-3" /> : <CalendarPlus className="w-3 h-3" />}
-                        {scheduleSuccess ? "Added" : "Schedule"}
-                    </button>
+                    {activeTab !== 'linkedin' && (
+                        <button onClick={handleSchedule} disabled={isScheduling || !results[activeTab as keyof typeof results]} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${scheduleSuccess ? "bg-green-500/20 text-green-400 border border-green-500/50" : "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/50"} disabled:opacity-50`}>
+                            {isScheduling ? <Loader2 className="w-3 h-3 animate-spin" /> : scheduleSuccess ? <Check className="w-3 h-3" /> : <CalendarPlus className="w-3 h-3" />}
+                            {scheduleSuccess ? "Added" : "Schedule"}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

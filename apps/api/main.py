@@ -486,6 +486,7 @@ async def generate_trends(req: IdeaRequest):
 
 class LinkedInPostRequest(BaseModel):
     linkedin_id: str
+    author_urn: str
     text: str
 
 @app.post("/api/linkedin/post")
@@ -506,8 +507,10 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
             "X-Restli-Protocol-Version": "2.0.0"
         }
 
+        target_urn = payload.author_urn if payload.author_urn else f"urn:li:person:{payload.linkedin_id}"
+
         post_data = {
-            "author": f"urn:li:person:{payload.linkedin_id}",
+            "author": target_urn,
             "lifecycleState": "PUBLISHED",
             "specificContent": {
                 "com.linkedin.ugc.ShareContent": {
@@ -536,4 +539,44 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
     except Exception as e:
         print(f"Posting Error: {e}")
         raise HTTPException(500, str(e))
+
+@app.get("/api/linkedin/companies")
+async def get_linkedin_companies(linkedin_id: str):
+    try:
+        res = supabase.table("social_tokens").select("access_token")\
+            .eq("user_email", f"linkedin_{linkedin_id}").execute()
+
+        if not res.data:
+            raise HTTPException(401, "LinkedIn not connected")
+
+        token = res.data[0]['access_token']
+
+        url = "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED"
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code != 200:
+            return {
+                "companies": []
+            }
+
+        data = response.json()
+        companies = []
+
+        for item in data.get('elements', []):
+            org_urn = item.get('organizationalTarget')
+            companies.append({"id": org_urn, "name": f"Company Page ({org_urn.split(':')[-1]})"})
+
+        return {"companies": companies}
+
+    except Exception as e:
+        print(f"Company Fetch Error: {e}")
+
+        return {"companies": []}
+
 

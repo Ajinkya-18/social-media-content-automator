@@ -48,7 +48,14 @@ SCOPES = [
     "openid"
 ]
 
-LINKEDIN_SCOPES = ["openid", "profile", "email", "w_member_social"]
+LINKEDIN_SCOPES = [
+    "openid", 
+    "profile", 
+    "email", 
+    "w_member_social", 
+    "w_organization_social",
+    "r_organization_social"
+    ]
 
 def generate_pkce_pair():
     code_verifier = secrets.token_urlsafe(64)
@@ -1018,7 +1025,7 @@ async def callback_linkedin(request: Request):
         ).json()
 
         linkedin_urn = profile_res.get("sub")
-        email = profile_res.get("email")
+        # email = profile_res.get("email")
 
         db_data = {
             "user_email": f"linkedin_{linkedin_urn}", # Unique ID for this provider
@@ -1033,7 +1040,7 @@ async def callback_linkedin(request: Request):
         frontend_url = os.getenv("FRONTEND_URL", "http://127.0.0.1:3000")
 
         return RedirectResponse(
-            f"{frontend_url}/dashboard?status=connected&provider=linkedin"
+            f"{frontend_url}/dashboard?status=connected&provider=linkedin&linkedin_id={linkedin_urn}"
         )
 
     except Exception as e:
