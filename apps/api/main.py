@@ -22,12 +22,12 @@ from vault import router as vault_router
 import time
 from huggingface_hub import InferenceClient
 from auth import LINKEDIN_SCOPES
-import google.generativeai as genai
+from google import genai
 
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 CREDIT_COSTS = {
     "script": 10,
@@ -110,8 +110,16 @@ async def generate_script(req: GenerateScriptRequest):
         print(f"Generating script using {model_name} for {tier} user...")
 
         if "gemini" in model_name:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(f"You are a pro scriptwriter. Write a script for: {req.prompt}. Tone: {req.tone}.")
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents={'text': f"You are a pro scriptwriter. Write a script for: {req.prompt}. Tone: {req.tone}."},
+                config={
+                    'temperature': 0,
+                    'top_p': 0.95,
+                    'top_k': 20,
+                },
+            )
+
             content = response.text
 
         else:
@@ -299,8 +307,15 @@ async def repurpose_content(req: RepurposeRequest):
         system_prompt = "You are an expert Social Media Manager. Return JSON only: {\"twitter\": \"...\", \"linkedin\": \"...\", \"instagram\": \"...\"}"
 
         if "gemini" in model_name:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(f"{system_prompt}\n\nTask: Repurpose this script:\n{req.script}\n\nTone: {req.tone}")
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents={'text': f"{system_prompt}\n\nTask: Repurpose this script:\n{req.script}\n\nTone: {req.tone}"},
+                config={
+                    'temperature': 0,
+                    'top_p': 0.95,
+                    'top_k': 20,
+                },
+            )
             content = response.text.replace("```json", "").replace("```", "")
 
         else:
