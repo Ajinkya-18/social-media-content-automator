@@ -10,6 +10,7 @@ from google.auth.transport.requests import Request as GoogleRequest
 from dotenv import load_dotenv
 from PIL import Image
 from collections import Counter
+from auth import SCOPES
 
 load_dotenv()
 
@@ -27,7 +28,7 @@ def get_refreshed_credentials(token_data):
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=["https://www.googleapis.com/auth/yt-analytics.readonly"]
+        scopes=SCOPES
     )
 
     if creds.expired and creds.refresh_token:
