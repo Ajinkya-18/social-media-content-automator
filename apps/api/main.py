@@ -11,7 +11,7 @@ from groq import Groq
 from dotenv import load_dotenv
 import base64
 import re
-from auth import router as auth_router
+from auth import router as auth_router, SCOPES
 from analytics import router as analytics_router
 from webhooks import router as webhooks_router
 from video import router as video_router
@@ -19,6 +19,8 @@ import json
 import replicate
 from supabase import create_client, Client
 from vault import router as vault_router
+import time
+from huggingface_hub import InferenceClient
 
 
 load_dotenv()
@@ -39,10 +41,11 @@ SCOPES = [
 ]
 
 groq_api_key = os.getenv("GROQ_API_KEY")
-
 client = Groq(
     api_key=groq_api_key,
 )
+
+hf_client = InferenceClient(token=os.getenv("HF_TOKEN"))
 
 app = FastAPI(title="AfterGlow - Studio")
 
@@ -333,31 +336,77 @@ class ImageRequest(BaseModel):
 @app.post("/api/generate-image")
 async def generate_image(payload: ImageRequest):
     try:
-        output = replicate.run(
-            "black-forest-labs/flux-schnell",
-            input={
-                "prompt": payload.prompt,
-                "aspect_ratio": payload.aspect_ratio,
-                "output_format": "webp",
-                "output_quality": 90
-            }
+        model_id = "black-forest-labs/flux.1-schnell"
+
+        width, height = 1024, 576
+        if payload.aspect_ratio == "1:1": width, height = 1024, 1024
+        if payload.aspect_ratio == "9:16": width, height = 576, 1024
+
+        print(f"Generating image via HF for {payload.email}...")
+
+        # output = replicate.run(
+        #     "black-forest-labs/flux-schnell",
+        #     input={
+        #         "prompt": payload.prompt,
+        #         "aspect_ratio": payload.aspect_ratio,
+        #         "output_format": "webp",
+        #         "output_quality": 90
+        #     }
+        # )
+
+        # if isinstance(output, list):
+        #     image_url = output[0].url if hasattr(output[0], 'url') else str(output[0])
+        
+        # else:
+        #     image_url = output.url if hasattr(output, 'url') else str(output)
+
+        image = hf_client.text_to_image(
+            payload.prompt,
+            model=model_id,
+            width=width,
+            height=height
         )
 
-        if isinstance(output, list):
-            image_url = output[0].url if hasattr(output[0], 'url') else str(output[0])
-        
-        else:
-            image_url = output.url if hasattr(output, 'url') else str(output)
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format="PNG")
+        img_bytes = img_byte_arr.getvalue()
+
+        safe_email = re.sub(r'[^a-zA-Z0-9]', '_', payload.email)
+        filename = f"{safe_email}_{int(time.time())}.png"
+        bucket_name = "generated_images"
+
+        print(f"Uploading {filename} to Supabase Storage...")
+
+        # if payload.email:
+        #     supabase.table("assets").insert({
+        #         "user_email": payload.email,
+        #         "asset_type": "image",
+        #         "content": image_url,
+        #         "metadata": {"prompt": payload.prompt, "aspect_ratio": payload.aspect_ratio}
+        #     }).execute()
+        supabase.storage.from_(bucket_name).upload(
+            path=filename,
+            file=img_bytes,
+            file_options={"content-type": "image/png"}
+        )
+
+        public_url = supabase.storage.from_(bucket_name).get_public_url(filename)
 
         if payload.email:
             supabase.table("assets").insert({
                 "user_email": payload.email,
                 "asset_type": "image",
-                "content": image_url,
-                "metadata": {"prompt": payload.prompt, "aspect_ratio": payload.aspect_ratio}
+                "content": public_url,
+                "metadata": {
+                    "prompt": payload.prompt,
+                    "aspect_ratio": payload.aspect_ratio,
+                    "model": "flux-schnell-hf",
+                    "storage_provider": "supabase",
+                    "filename": filename
+                }
             }).execute()
 
-        return {"imageUrl": image_url}
+        return {"imageUrl": public_url}
 
     except Exception as e:
         print(f"Image Gen Error: {str(e)}")
