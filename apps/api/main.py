@@ -405,7 +405,7 @@ async def generate_image(payload: ImageRequest):
         
         if tier == "pro":
             print(f"Generating image via Google Imagen 3 for {tier} user...")
-            model_id = "imagen-4.0-generate-001"
+            model_id = "imagen-3.0-generate-001"
 
             response = client.models.generate_images(
                 model=model_id,
