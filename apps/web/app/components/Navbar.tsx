@@ -18,7 +18,7 @@ export default function Navbar() {
           <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 text-transparent bg-clip-text group-hover:to-orange-500 transition-all duration-500">
             AfterGlow
           </span>
-          <span className="text-xs text-orange-500 font-mono ml-1 align-top">v2</span>
+          {/* <span className="text-xs text-orange-500 font-mono ml-1 align-top">v2</span> */}
         </Link>
       </div>
 

@@ -23,6 +23,7 @@ import time
 from huggingface_hub import InferenceClient
 from auth import LINKEDIN_SCOPES
 from google import genai
+from google.genai import types
 import requests
 
 
@@ -112,13 +113,13 @@ async def generate_script(req: GenerateScriptRequest):
 
         if "gemini" in model_name:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model=model_name,
                 contents={'text': f"You are a pro scriptwriter. Write a script for: {req.prompt}. Tone: {req.tone}."},
-                config={
-                    'temperature': 0,
-                    'top_p': 0.95,
-                    'top_k': 20,
-                },
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                    top_p=0.95,
+                    top_k=40,
+                )
             )
 
             content = response.text
@@ -309,15 +310,14 @@ async def repurpose_content(req: RepurposeRequest):
 
         if "gemini" in model_name:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model=model_name,
                 contents={'text': f"{system_prompt}\n\nTask: Repurpose this script:\n{req.script}\n\nTone: {req.tone}"},
-                config={
-                    'temperature': 0,
-                    'top_p': 0.95,
-                    'top_k': 20,
-                },
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    response_mime_type="application/json"
+                )
             )
-            content = response.text.replace("```json", "").replace("```", "")
+            content = response.text
 
         else:
             chat = client.chat.completions.create(
@@ -599,14 +599,14 @@ async def get_linkedin_companies(linkedin_id: str):
 
         token = res.data[0]['access_token']
 
-        url = "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED"
+        url_list = "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED"
 
         headers = {
             "Authorization": f"Bearer {token}",
             "X-Restli-Protocol-Version": "2.0.0"
         }
 
-        response = requests.get(url, headers=headers)
+        response = requests.get(url_list, headers=headers)
 
         if response.status_code != 200:
             return {
@@ -618,7 +618,23 @@ async def get_linkedin_companies(linkedin_id: str):
 
         for item in data.get('elements', []):
             org_urn = item.get('organizationalTarget')
-            companies.append({"id": org_urn, "name": f"Company Page ({org_urn.split(':')[-1]})"})
+            org_id = org_urn.split(":")[-1]
+
+            try:
+                org_url = f"https://api.linkedin.com/v2/organizations/{org_id}"
+                org_res = requests.get(org_url, headers=headers)
+
+                if org_res.status_code == 200:
+                    org_data = org_res.json()
+
+                    name = org_data.get("localizedName", f"Company {org_id}")
+                    companies.append({"id": org_urn, "name": name})
+                else:
+                    companies.append({"id": org_urn, "name": f"Company {org_id} (No Access)"})
+            
+            except Exception as e:
+                print(f"Failed to fetch name for {org_id}: {e}")
+                companies.append({"id": org_urn, "name": f"Company {org_id}"})
 
         return {"companies": companies}
 
