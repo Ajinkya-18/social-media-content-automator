@@ -743,8 +743,8 @@ class OrderRequest(BaseModel):
 async def create_razorpay_order(payload: OrderRequest):
     try:
         prices = {
-            "starter": 99900, # In Paisa: Rs.999 -> P99900
-            "pro": 149900, # In Paisa: Rs.1499 -> P149900
+            "starter": 99900, # In Paisa: Rs.999 -> P99900  # 250 credits
+            "pro": 249900, # In Paisa: Rs.2499 -> P249900 # 500 credits
             "credits_100": 49900 # In Paisa: Rs.499 -> P49900
         }
 

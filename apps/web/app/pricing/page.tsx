@@ -88,7 +88,7 @@ export default function PricingPage() {
           Invest in <span className="bg-gradient-to-r from-orange-400 to-amber-600 text-transparent bg-clip-text">Performance</span>
         </h1>
         <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-          Flexible credits for AI generation. Subscription for the SaaS platform.
+          Credits subscription for AI generation and AfterGlow.
         </p>
         
         {isSignedIn && (
@@ -105,9 +105,9 @@ export default function PricingPage() {
         {/* STARTER */}
         <PricingCard 
             title="Starter" 
-            price="₹500" 
+            price="₹999" 
             period="/mo"
-            credits="500"
+            credits="250"
             features={["Basic Analytics", "Standard Sync", "Email Support"]}
             icon={<Box className="w-6 h-6 text-cyan-400" />}
             onBuy={() => handleBuy('starter')}
@@ -119,9 +119,9 @@ export default function PricingPage() {
             <div className="absolute inset-0 bg-gradient-to-b from-orange-500 to-red-600 rounded-2xl blur opacity-30" />
             <PricingCard 
                 title="Pro Suite" 
-                price="₹1500" 
+                price="₹2499" 
                 period="/mo"
-                credits="2000"
+                credits="500"
                 features={["Advanced AI Models", "Priority Rendering", "Unlimited Sync", "Agentic Features (Beta)"]}
                 icon={<Crown className="w-6 h-6 text-amber-400" />}
                 highlighted
@@ -133,7 +133,7 @@ export default function PricingPage() {
         {/* TOP UP */}
         <PricingCard 
             title="Credit Top-Up" 
-            price="₹100" 
+            price="₹499" 
             period=""
             credits="100"
             features={["Never Expires", "Add to any plan", "Pay as you go"]}
