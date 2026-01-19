@@ -410,7 +410,7 @@ async def generate_image(payload: ImageRequest):
             response = google_client.models.generate_images(
                 model=model_id,
                 prompt=payload.prompt,
-                config=types.GenerateImageConfig(
+                config=types.GenerateImagesConfig(
                     aspect_ratio=payload.aspect_ratio,
                     number_of_images=1,
                     image_size="2K"
