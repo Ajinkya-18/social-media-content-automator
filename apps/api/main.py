@@ -23,6 +23,7 @@ import time
 from huggingface_hub import InferenceClient
 from auth import LINKEDIN_SCOPES
 from google import genai
+import requests
 
 
 load_dotenv()
