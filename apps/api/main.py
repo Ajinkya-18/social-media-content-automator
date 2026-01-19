@@ -59,7 +59,10 @@ client = Groq(
     api_key=groq_api_key,
 )
 
-hf_client = InferenceClient(token=os.getenv("HF_TOKEN"))
+hf_client = InferenceClient(
+    provider="hf-inference",
+    api_key=os.getenv("HF_TOKEN"),
+)
 
 app = FastAPI(title="AfterGlow - Studio")
 
@@ -399,31 +402,44 @@ async def generate_image(payload: ImageRequest):
         # Free: Flux Schnell (HF)
         # Standard: Playground v2.5 (HF) - Better artistic control
         # Pro: Stable Diffusion 3.5 Large (HF) - Top tier
-
-        model_id = "black-forest-labs/flux.1-schnell"
-
-        if tier == "standard": 
-            model_id = "playgroundai/playground-v2.5-1024px-aesthetic"
         
-        elif tier == "pro":
-            model_id = "stabilityai/stable-diffusion-3.5-large"
+        if tier == "pro":
+            print(f"Generating image via Google Imagen 3 for {tier} user...")
+            model_id = "imagen-4.0-generate-001"
 
-        print(f"Generating image via {model_id} for {tier} user...")
+            response = client.models.generate_images(
+                model=model_id,
+                prompt=payload.prompt,
+                config=types.GenerateImageConfig(
+                    aspect_ratio=payload.aspect_ratio,
+                    number_of_images=1
+                )
+            )
 
-        width, height = 1024, 576
-        if payload.aspect_ratio == "1:1": width, height = 1024, 1024
-        if payload.aspect_ratio == "9:16": width, height = 576, 1024
+            img_bytes = response.generated_images[0].image.image_bytes
 
-        image = hf_client.text_to_image(
-            payload.prompt,
-            model=model_id,
-            width=width,
-            height=height
-        )
+        else:
+            model_id = "black-forest-labs/flux.1-schnell"
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format="PNG")
-        img_bytes = img_byte_arr.getvalue()
+            if tier == "standard": 
+                model_id = "stabilityai/stable-diffusion-xl-base-1.0"
+
+            print(f"Generating image via {model_id} for {tier} user...")
+
+            width, height = 1024, 576
+            if payload.aspect_ratio == "1:1": width, height = 1024, 1024
+            if payload.aspect_ratio == "9:16": width, height = 576, 1024
+
+            image = hf_client.text_to_image(
+                payload.prompt,
+                model=model_id,
+                width=width,
+                height=height
+            )
+
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format="PNG")
+            img_bytes = img_byte_arr.getvalue()
 
         safe_email = re.sub(r'[^a-zA-Z0-9]', '_', payload.email)
         filename = f"{safe_email}_{int(time.time())}.png"
