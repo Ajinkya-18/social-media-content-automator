@@ -412,7 +412,8 @@ async def generate_image(payload: ImageRequest):
                 prompt=payload.prompt,
                 config=types.GenerateImageConfig(
                     aspect_ratio=payload.aspect_ratio,
-                    number_of_images=1
+                    number_of_images=1,
+                    image_size="2K"
                 )
             )
 
