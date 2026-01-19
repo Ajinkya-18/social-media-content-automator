@@ -60,7 +60,7 @@ groq_client = Groq(
 )
 
 hf_client = InferenceClient(
-    provider="hf-inference",
+    provider="auto",
     api_key=os.getenv("HF_TOKEN"),
 )
 
