@@ -54,7 +54,9 @@ LINKEDIN_SCOPES = [
     "email", 
     "w_member_social", 
     "w_organization_social",
-    "r_organization_social"
+    "r_organization_social",
+    "r_organization_admin",  # <--- NEW: Required to list companies
+    "rw_organization_admin"
     ]
 
 def generate_pkce_pair():
