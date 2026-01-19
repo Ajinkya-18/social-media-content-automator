@@ -29,7 +29,7 @@ import requests
 
 load_dotenv()
 
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+google_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 CREDIT_COSTS = {
     "script": 10,
@@ -55,7 +55,7 @@ SCOPES = [
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 
-client = Groq(
+groq_client = Groq(
     api_key=groq_api_key,
 )
 
@@ -115,7 +115,7 @@ async def generate_script(req: GenerateScriptRequest):
         print(f"Generating script using {model_name} for {tier} user...")
 
         if "gemini" in model_name:
-            response = client.models.generate_content(
+            response = google_client.models.generate_content(
                 model=model_name,
                 contents={'text': f"You are a pro scriptwriter. Write a script for: {req.prompt}. Tone: {req.tone}."},
                 config=types.GenerateContentConfig(
@@ -128,7 +128,7 @@ async def generate_script(req: GenerateScriptRequest):
             content = response.text
 
         else:
-            chat = client.chat.completions.create(
+            chat = groq_client.chat.completions.create(
                 messages=[
                     {
                         "role": "system",
@@ -312,7 +312,7 @@ async def repurpose_content(req: RepurposeRequest):
         system_prompt = "You are an expert Social Media Manager. Return JSON only: {\"twitter\": \"...\", \"linkedin\": \"...\", \"instagram\": \"...\"}"
 
         if "gemini" in model_name:
-            response = client.models.generate_content(
+            response = google_client.models.generate_content(
                 model=model_name,
                 contents={'text': f"{system_prompt}\n\nTask: Repurpose this script:\n{req.script}\n\nTone: {req.tone}"},
                 config=types.GenerateContentConfig(
@@ -323,7 +323,7 @@ async def repurpose_content(req: RepurposeRequest):
             content = response.text
 
         else:
-            chat = client.chat.completions.create(
+            chat = groq_client.chat.completions.create(
                 messages=[
                     {
                         "role": "system",
@@ -407,7 +407,7 @@ async def generate_image(payload: ImageRequest):
             print(f"Generating image via Google Imagen 3 for {tier} user...")
             model_id = "imagen-3.0-generate-001"
 
-            response = client.models.generate_images(
+            response = google_client.models.generate_images(
                 model=model_id,
                 prompt=payload.prompt,
                 config=types.GenerateImageConfig(
