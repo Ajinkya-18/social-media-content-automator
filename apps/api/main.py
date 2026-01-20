@@ -731,12 +731,12 @@ class LinkedInPostRequest(BaseModel):
 @app.post("/api/linkedin/post")
 async def post_to_linkedin(payload: LinkedInPostRequest):
     try:
-        res = supabase.table("social_tokens").select("acess_token")\
+        res = supabase.table("social_tokens").select("access_token")\
             .eq("user_email", f"linkedin_{payload.linkedin_id}")\
             .execute()
 
         if not res.data:
-            raise HTPException(401, "LinkedIn not connected")
+            raise HTTPException(401, "LinkedIn not connected")
 
         token = res.data[0]['access_token']
         headers = {
@@ -773,15 +773,23 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
 
             upload_data = reg_res.json()
             upload_url = upload_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
-            media_asset_urn = upload_data['value']['asset']
+            asset = upload_data['value']['asset']
 
-            img_content = requests.get(payload.image_url).content
+            try:
+                img_content = requests.get(payload.image_url).content
+            
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
 
-            upload_headers = {"Authorization": f"Bearer {token}"}
-            put_res = requests.put(upload_url, headers=upload_headers, data=img_content)
+            # upload_headers = {"Authorization": f"Bearer {token}"}
+            put_res = requests.put(upload_url, data=img_content)
 
-            if put_res.status_code != 201:
+            if put_res.status_code not in [200, 201]:
                 print(f"Binary Upload Failed: {put_res.text}")
+                media_asset_urn = None
+
+            else:
+                media_asset_urn = asset
 
         post_data = {
             "author": target_urn,
@@ -794,9 +802,9 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
                     "shareMediaCategory": "IMAGE" if media_asset_urn else "NONE",
                     "media": [{
                         "status": "READY",
-                        "description": {"text": "Image from AfterGlow"},
+                        "description": {"text": "Shared via AfterGlow"},
                         "media": media_asset_urn,
-                        "title": {"text": "Shared Media"}
+                        "title": {"text": "Image"}
                     }] if media_asset_urn else []
                 }
             },
@@ -806,7 +814,7 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
         }
 
         if not media_asset_urn:
-            del post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["media"]
+            post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = []
             post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "NONE"
 
         response = requests.post(
@@ -820,6 +828,9 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
 
         return {"status": "success", "post_id": response.json().get("id")}
 
+    except HTTPException as he:
+        raise he
+        
     except Exception as e:
         print(f"Posting Error: {e}")
         raise HTTPException(500, str(e))
