@@ -8,7 +8,8 @@ import {
   LayoutDashboard, Users, Eye, Video, Activity, ExternalLink, 
   Loader2, LogOut, Wand2, X, Image as ImageIcon, Youtube,
   Instagram, Flame, ArrowRight, Target, RefreshCw, PieChart,
-  TrendingUp, Palette, Linkedin, MousePointer, Clock, BarChart3
+  TrendingUp, Palette, Linkedin, MousePointer, Clock, BarChart3,
+  User // Imported User icon
 } from "lucide-react";
 
 // --- COMPONENTS ---
@@ -153,17 +154,22 @@ function DashboardContent() {
           const data = await res.json();
           if (data.companies) {
               setLiCompanies(data.companies);
-              // Default to Personal Profile ("") if no companies, or just let user choose
-              // We don't auto-select a company anymore to allow Personal Profile as default option
-              fetchLinkedinStats(id, ""); 
+              // Default to Personal Profile ("") if no companies or let user choose
+              // Note: We deliberately do NOT auto-select the first company here anymore
+              // so the user starts on their profile or can choose.
           }
       } catch (e) { console.error("LI Companies Error", e); }
   };
 
   const fetchLinkedinStats = async (id: string, urn: string) => {
+      // If URN is empty (Personal Profile), don't fetch stats
+      if (!urn) {
+          setLiStats(null);
+          return;
+      }
+
       setLiLoading(true);
       try {
-          // If urn is empty, it fetches personal profile info (but maybe no stats if API limited)
           const res = await fetch(`${apiUrl}/api/analytics/linkedin?linkedin_id=${id}&company_urn=${urn}`);
           if (res.ok) setLiStats(await res.json());
       } catch (e) { console.error("LI Stats Error", e); }
@@ -214,7 +220,7 @@ function DashboardContent() {
   const openThumbnailPicker = async (videoId: string) => {
     setSelectedVideo(videoId);
     setPickerOpen(true);
-    const canvaId = localStorage.getItem('canva_id'); // Assuming stored from Studio
+    const canvaId = localStorage.getItem('canva_id'); 
     
     if (canvaDesigns.length === 0 && canvaId) {
         setLoadingDesigns(true);
@@ -469,14 +475,28 @@ function DashboardContent() {
                         <div className="flex items-center gap-3">
                             <Linkedin className="w-6 h-6 text-blue-500" />
                             <select value={selectedCompany} onChange={handleCompanyChange} aria-label="Select LinkedIn company" className="bg-black/40 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none min-w-[200px]">
-                                <option value="">Personal Profile</option> {/* Added Personal Profile Option */}
+                                <option value="">Personal Profile</option>
                                 {liCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
                         <button onClick={() => { localStorage.removeItem('linkedin_id'); setLiConnected(false); }} className="text-xs text-red-400 hover:text-red-300">Disconnect</button>
                     </div>
 
-                    {liStats ? (
+                    {/* Logic to handle Personal Profile vs Company Page */}
+                    {selectedCompany === "" ? (
+                        <div className="flex flex-col items-center justify-center py-20 bg-[#0b1121] border border-white/5 border-dashed rounded-xl text-center space-y-4">
+                            <div className="p-4 bg-blue-500/10 rounded-full">
+                                <User className="w-8 h-8 text-blue-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-white">Personal Profile Selected</h3>
+                                <p className="text-slate-400 text-sm max-w-md mt-1 mx-auto">
+                                    Due to LinkedIn API restrictions, detailed analytics (Impressions, Engagement) are only available for 
+                                    <span className="text-white font-bold"> Company Pages</span>.
+                                </p>
+                            </div>
+                        </div>
+                    ) : liStats ? (
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <StatCard icon={<Eye/>} label="Impressions" value={liStats.overview?.impressions?.toLocaleString() || "0"} color="text-blue-400" />
                             <StatCard icon={<MousePointer/>} label="Clicks" value={liStats.overview?.clicks?.toLocaleString() || "0"} color="text-purple-400" />
@@ -485,7 +505,7 @@ function DashboardContent() {
                         </div>
                     ) : (
                         <div className="text-center py-10 text-slate-500 flex flex-col items-center">
-                            {liLoading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : "Select a company or profile to view intelligence."}
+                            {liLoading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : "Select a company to view intelligence."}
                         </div>
                     )}
                   </>
