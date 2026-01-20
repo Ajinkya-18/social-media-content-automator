@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useUser } from "@clerk/nextjs";
-import { useCredits } from "../../components/CreditsContext"; // Ensure this path matches your project structure
+import { useCredits } from "../../components/CreditsContext"; 
 import { 
   LayoutDashboard, Users, Eye, Video, Activity, ExternalLink, 
   Loader2, LogOut, Wand2, X, Image as ImageIcon, Youtube,
@@ -151,10 +151,11 @@ function DashboardContent() {
       try {
           const res = await fetch(`${apiUrl}/api/linkedin/companies?linkedin_id=${id}`);
           const data = await res.json();
-          if (data.companies && data.companies.length > 0) {
+          if (data.companies) {
               setLiCompanies(data.companies);
-              setSelectedCompany(data.companies[0].id); // Default to first
-              fetchLinkedinStats(id, data.companies[0].id);
+              // Default to Personal Profile ("") if no companies, or just let user choose
+              // We don't auto-select a company anymore to allow Personal Profile as default option
+              fetchLinkedinStats(id, ""); 
           }
       } catch (e) { console.error("LI Companies Error", e); }
   };
@@ -162,6 +163,7 @@ function DashboardContent() {
   const fetchLinkedinStats = async (id: string, urn: string) => {
       setLiLoading(true);
       try {
+          // If urn is empty, it fetches personal profile info (but maybe no stats if API limited)
           const res = await fetch(`${apiUrl}/api/analytics/linkedin?linkedin_id=${id}&company_urn=${urn}`);
           if (res.ok) setLiStats(await res.json());
       } catch (e) { console.error("LI Stats Error", e); }
@@ -386,6 +388,26 @@ function DashboardContent() {
                   </div>
               ) : (
                   <>
+                    {/* YouTube Header & Disconnect */}
+                    <div className="flex justify-between items-center bg-[#0b1121] p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-3">
+                            <Youtube className="w-6 h-6 text-red-500" />
+                            <span className="text-white font-bold text-sm">
+                                {ytStats?.channel_name || "Connected Channel"}
+                            </span>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                localStorage.removeItem('yt_email');
+                                setYtEmail(null);
+                                setYtStats(null);
+                            }} 
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        >
+                            Disconnect
+                        </button>
+                    </div>
+
                     {/* YT Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <StatCard icon={<Eye/>} label="30-Day Views" value={ytStats?.overview?.views?.toLocaleString() || "0"} color="text-red-400" />
@@ -447,6 +469,7 @@ function DashboardContent() {
                         <div className="flex items-center gap-3">
                             <Linkedin className="w-6 h-6 text-blue-500" />
                             <select value={selectedCompany} onChange={handleCompanyChange} aria-label="Select LinkedIn company" className="bg-black/40 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none min-w-[200px]">
+                                <option value="">Personal Profile</option> {/* Added Personal Profile Option */}
                                 {liCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
@@ -462,7 +485,7 @@ function DashboardContent() {
                         </div>
                     ) : (
                         <div className="text-center py-10 text-slate-500 flex flex-col items-center">
-                            {liLoading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : "Select a company to view intelligence."}
+                            {liLoading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : "Select a company or profile to view intelligence."}
                         </div>
                     )}
                   </>
