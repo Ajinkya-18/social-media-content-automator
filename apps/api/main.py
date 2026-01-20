@@ -796,4 +796,16 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
         print(f"Posting Error: {e}")
         raise HTTPException(500, str(e))
 
+@app.get("/api/vault/scripts")
+async def get_vault_scripts(email:str):
+    try:
+        res = supabase.table("assets").select("*")\
+            .eq("user_email", email).eq("asset_type", "script")\
+            .order("created_at", desc=True).limit(20).execute()
+
+        return {"scripts": res.data}
+
+    except Exception as e:
+        print(f"Vault Script Error: {e}")
+        return {"scripts": []}
 
