@@ -1,5 +1,6 @@
 import os
 import datetime
+from datetime import timedelta
 import io
 import requests
 from fastapi import APIRouter, HTTPException
@@ -53,40 +54,120 @@ async def get_youtube_stats(email:str):
 
         creds = get_refreshed_credentials(token_data)
 
+        yt_data = build('youtube', 'v3', credentials=creds)
         youtube_analytics = build('youtubeAnalytics', 'v2', credentials=creds)
 
+        channel_res = yt_data.channels().list(mine=True, part="snippet,statistics").execute()
+
+        if not channel_res.get("items"):
+            raise HTTPException(404, "No channel found")
+
+        stats_lifetime = channel_res["items"][0]["statistics"]
+        channel_title = channel_res["items"][0]["snippet"]["title"]
+
         end_date = datetime.date.today().strftime('%Y-%m-%d')
-        start_date = (datetime.date.today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
+        start_date = (datetime.date.today() - timedelta(days=30)).strftime('%Y-%m-%d')
 
         report = youtube_analytics.reports().query(
             ids='channel==MINE',
             startDate=start_date,
             endDate=end_date,
-            metrics='views,likes',
+            metrics='views,estimatedMinutesWatched,likes,subscribersGained',
             dimensions='day',
             sort='day'
         ).execute()
 
+        rows = report.get("rows", [])
 
-        chart_data = []
+        period_views = sum(r[1] for r in rows)
+        period_minutes = sum(r[2] for r in rows)
+        period_likes = sum(r[3] for r in rows)
 
-        if 'rows' in report and report['rows']:
-            for row in report['rows']:
-                date_obj = datetime.datetime.strptime(row[0], '%Y-%m-%d')
-                day_name = date_obj.strftime('%a')
-                total_engagement = row[1] + row[2]
+        graph_data = [{"date": r[0], "views": r[1], "likes": r[3]} for r in rows]
 
-                chart_data.append({
-                    "name": day_name,
-                    "engagement": total_engagement,
-                    "views": row[1],
-                    "likes": row[2]
-                })
-            
-            return {"status": "success", "data": chart_data}
+        return {
+            "status": "success",
+            "channel_name": channel_title,
+            "overview": {
+                "views": period_views,
+                "watch_time_hours": int(period_minutes / 60),
+                "likes": period_likes,
+                "total_subs": stats_lifetime.get("subscriberCount"),
+                "total_views": stats_lifetime.get("viewCount")
+            },
+            "graph_data": graph_data
+        }
 
     except Exception as e:
-        print(f"Analytics Error: {e}")
+        print(f"YT Analytics Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/analytics/linkedin")
+async def get_linkedin_analytics(linkedin_id: str, company_urn: str = None):
+    try:
+        res = supabase.table("social_tokens").select("access_token")\
+            .eq("user_email", f"linkedin_{linkedin_id}").execute()
+
+        if not res.data:
+            return {"connected": False}
+
+        token = res.data[0]['access_token']
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+
+        if not company_urn:
+            user_info = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers).json()
+
+            return {
+                "connected": True,
+                "profile": {
+                    "name": f"{user_info.get('given_name')} {user_info.get('family_name')}",
+                    "picture": user_info.get("picture")
+                },
+                "message": "select a company to view stats"
+            }
+        
+        encoded_urn = company_urn.replace(":", "%3A")
+        url = f"https://api.linkedin.com/v2/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity={encoded_urn}"
+
+        stats_res = requests.get(url, headers=headers)
+
+        if stats_res.status_code != 200:
+            print(f"LI Stats Error: {stats_res.text}")
+            return {"connected": True, "error": "Could not fetch stats. Ensure you are a Page Admin."}
+
+        data = stats_res.json()
+
+        total_impressions = 0
+        total_engagements = 0
+        total_clicks = 0
+        total_likes = 0
+
+        elements = data.get("elements", [])
+
+        for el in elements:
+            total = el.get("totalShareStatistics", {})
+            total_impressions += total.get("impressionCount", 0)
+            total_clicks += total.get("clickCount", 0)
+            total_likes += total.get("likeCount", 0)
+            total_engagements += (total.get("shareCount", 0) + total.get("likeCount", 0) + total.get("clickCount", 0))
+
+        return {
+            "connected": True,
+            "company_urn": company_urn,
+            "overview": {
+                "impressions": total_impressions,
+                "engagements": total_engagements,
+                "clicks": total_clicks,
+                "likes": total_likes
+            }
+        }
+    
+    except Exception as e:
+        print(f"LinkedIn Analytics Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 def get_dominant_color(image_url):
@@ -196,39 +277,3 @@ async def get_analytics_intelligence(email: str):
             }
         }
 
-@router.get("/api/analytics/linkedin")
-async def get_linkedin_stats(linkedin_id: str):
-    try:
-        response = supabase.table("social_tokens").select("access_token")\
-            .eq("user_email", f"linkedin_{linkedin_id}")\
-                .eq("provider", "linkedin").execute()
-
-        if not response.data:
-            raise HTTPException(401, "LinkedIn not connected")
-
-        token = response.data[0]['access_token']
-        headers = {"Authorization": f"Bearer {token}"}
-
-        user_info = requests.get("https://api.linkedin.com/v2/userinfo", headers=headers).json()
-
-        return {
-            "status": "success",
-            "profile": {
-                "name": f"{user_info.get('given_name')} {user_info.get('family_name')}",
-                "picture": user_info.get("picture"),
-                "email": user_info.get("email")
-            },
-            "engagement_history": [
-                {"day": "Mon", "views": 120, "likes": 45},
-                {"day": "Tue", "views": 230, "likes": 89},
-                {"day": "Wed", "views": 180, "likes": 60},
-                {"day": "Thu", "views": 450, "likes": 120},
-                {"day": "Fri", "views": 320, "likes": 95},
-            ],
-            "top_performing_post": "The Future of AI in B2B Marketing..."
-        }
-
-    except Exception as e:
-        print(f"LinkedIn Analytics Error: {e}")
-        raise HTTPException(500, str(e))
-    
