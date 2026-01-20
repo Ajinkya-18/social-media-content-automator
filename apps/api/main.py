@@ -750,7 +750,23 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
         media_asset_urn = None
 
         if payload.image_url:
-            print(f"Uploading image to LinkedIn for {target_urn}...")
+            print(f"Processing image for LinkedIn: {payload.image_url}")
+
+            try:
+                img_resp = requests.get(payload.image_url, timeout=15)
+
+                if image_resp.status_code != 200:
+                    print(f"❌ Image Download Failed: {img_resp.status_code} - {img_resp.text[:100]}")
+                    raise HTTPException(status_code=400, detail=f"Could not download image from Vault. Status: {img_resp.status_code}")
+
+                img_content = img_resp.content
+
+                if len(img_content) < 100:
+                    raise HTTPException(status_code=400, detail="Image file is too small or empty.")
+            
+            except Exception as e:
+                print(f"Image Fetch Error: {e}")
+                raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
 
             reg_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
             reg_body = {
@@ -775,21 +791,25 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
             upload_url = upload_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
             asset = upload_data['value']['asset']
 
-            try:
-                img_content = requests.get(payload.image_url).content
+            # try:
+            #     img_content = requests.get(payload.image_url).content
             
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
+            # except Exception as e:
+            #     raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
 
             # upload_headers = {"Authorization": f"Bearer {token}"}
-            put_res = requests.put(upload_url, data=img_content)
+
+            print(f"Uploading {len(img_content)} bytes to LinkedIn...")
+            put_res = requests.put(upload_url, data=img_content, headers={"Content-Type": "application/octet-stream"})
 
             if put_res.status_code not in [200, 201]:
                 print(f"Binary Upload Failed: {put_res.text}")
-                media_asset_urn = None
 
-            else:
-                media_asset_urn = asset
+                raise HTTPException(status_code=500, detail="Failed to upload image binary to LinkedIn.")
+
+            media_asset_urn = asset
+            
+            print(f"Image uploaded successfully. Asset: {asset}")
 
         post_data = {
             "author": target_urn,
@@ -824,6 +844,7 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
         )
 
         if response.status_code != 201:
+            print(f"LinkedIn Create Error: {response.text}")
             raise HTTPException(400, f"LinkedIn Error: {response.text}")
 
         return {"status": "success", "post_id": response.json().get("id")}
