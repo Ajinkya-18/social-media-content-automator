@@ -549,7 +549,7 @@ async def generate_trends(req: IdeaRequest):
         ]
         """
 
-        chat_completion = client.chat.completions.create(
+        chat_completion = groq_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": "Give me 3 viral ideas now."}
