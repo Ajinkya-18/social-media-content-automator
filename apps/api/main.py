@@ -578,10 +578,99 @@ async def generate_trends(req: IdeaRequest):
         print(f"Trend Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/linkedin/companies")
+async def get_linkedin_companies(linkedin_id: str):
+    try:
+        res = supabase.table("social_tokens").select("access_token")\
+            .eq("user_email", f"linkedin_{linkedin_id}").execute()
+
+        if not res.data:
+            raise HTTPException(401, "LinkedIn not connected")
+
+        token = res.data[0]['access_token']
+
+        url_list = "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED"
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+
+        response = requests.get(url_list, headers=headers)
+
+        if response.status_code != 200:
+            return {
+                "companies": []
+            }
+
+        data = response.json()
+        companies = []
+
+        for item in data.get('elements', []):
+            org_urn = item.get('organizationalTarget')
+            org_id = org_urn.split(":")[-1]
+
+            try:
+                org_url = f"https://api.linkedin.com/v2/organizations/{org_id}"
+                org_res = requests.get(org_url, headers=headers)
+
+                if org_res.status_code == 200:
+                    org_data = org_res.json()
+
+                    name = org_data.get("localizedName", f"Company {org_id}")
+                    companies.append({"id": org_urn, "name": name})
+                else:
+                    companies.append({"id": org_urn, "name": f"Company {org_id} (No Access)"})
+            
+            except Exception as e:
+                print(f"Failed to fetch name for {org_id}: {e}")
+                companies.append({"id": org_urn, "name": f"Company {org_id}"})
+
+        return {"companies": companies}
+
+    except Exception as e:
+        print(f"Company Fetch Error: {e}")
+
+        return {"companies": []}
+
+async def process_credits(email: str, cost: int):
+    res = supabase.table("profiles").select("credits_balance, subscription_tier")\
+        .eq("user_email", email).execute()
+
+    if not res.data:
+        supabase.table("profiles").insert({"user_email": email, "credits_balance": 50, "subscription_tier": "free"}).execute()
+        return "free"
+
+    profile = res.data[0]
+
+    if profile['credits_balance'] < cost:
+        raise HTTPException(402, detail=f"Insufficient credits. Need {cost}, have {profile['credits_balance']}.")
+
+    new_balance = profile['credits_balance'] - cost
+    supabase.table("profiles").update({"credits_balance": new_balance})\
+        .eq("user_email", email).execute()
+
+    return profile['subscription_tier']
+
+@app.get("/api/vault/images")
+async def get_vault_images(email: str):
+    try:
+        res = supabase.table("assets").select("*")\
+            .eq("user_email", email)\
+            .eq("asset_type", "image")\
+            .order("created_at", desc=True).limit(20).execute()
+
+        return {"images": res.data}
+    
+    except Exception as e:
+        print(f"Vault Error: {e}")
+        return {"images": []}
+
 class LinkedInPostRequest(BaseModel):
     linkedin_id: str
     author_urn: str
     text: str
+    image_url: Optional[str] = None
 
 @app.post("/api/linkedin/post")
 async def post_to_linkedin(payload: LinkedInPostRequest):
@@ -704,228 +793,6 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
 
     except HTTPException as he:
         raise he  
-    except Exception as e:
-        print(f"Posting Error: {e}")
-        raise HTTPException(500, str(e))
-
-@app.get("/api/linkedin/companies")
-async def get_linkedin_companies(linkedin_id: str):
-    try:
-        res = supabase.table("social_tokens").select("access_token")\
-            .eq("user_email", f"linkedin_{linkedin_id}").execute()
-
-        if not res.data:
-            raise HTTPException(401, "LinkedIn not connected")
-
-        token = res.data[0]['access_token']
-
-        url_list = "https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED"
-
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "X-Restli-Protocol-Version": "2.0.0"
-        }
-
-        response = requests.get(url_list, headers=headers)
-
-        if response.status_code != 200:
-            return {
-                "companies": []
-            }
-
-        data = response.json()
-        companies = []
-
-        for item in data.get('elements', []):
-            org_urn = item.get('organizationalTarget')
-            org_id = org_urn.split(":")[-1]
-
-            try:
-                org_url = f"https://api.linkedin.com/v2/organizations/{org_id}"
-                org_res = requests.get(org_url, headers=headers)
-
-                if org_res.status_code == 200:
-                    org_data = org_res.json()
-
-                    name = org_data.get("localizedName", f"Company {org_id}")
-                    companies.append({"id": org_urn, "name": name})
-                else:
-                    companies.append({"id": org_urn, "name": f"Company {org_id} (No Access)"})
-            
-            except Exception as e:
-                print(f"Failed to fetch name for {org_id}: {e}")
-                companies.append({"id": org_urn, "name": f"Company {org_id}"})
-
-        return {"companies": companies}
-
-    except Exception as e:
-        print(f"Company Fetch Error: {e}")
-
-        return {"companies": []}
-
-async def process_credits(email: str, cost: int):
-    res = supabase.table("profiles").select("credits_balance, subscription_tier")\
-        .eq("user_email", email).execute()
-
-    if not res.data:
-        supabase.table("profiles").insert({"user_email": email, "credits_balance": 50, "subscription_tier": "free"}).execute()
-        return "free"
-
-    profile = res.data[0]
-
-    if profile['credits_balance'] < cost:
-        raise HTTPException(402, detail=f"Insufficient credits. Need {cost}, have {profile['credits_balance']}.")
-
-    new_balance = profile['credits_balance'] - cost
-    supabase.table("profiles").update({"credits_balance": new_balance})\
-        .eq("user_email", email).execute()
-
-    return profile['subscription_tier']
-
-@app.get("/api/vault/images")
-async def get_vault_images(email: str):
-    try:
-        res = supabase.table("assets").select("*")\
-            .eq("user_email", email)\
-            .eq("asset_type", "image")\
-            .order("created_at", desc=True).limit(20).execute()
-
-        return {"images": res.data}
-    
-    except Exception as e:
-        print(f"Vault Error: {e}")
-        return {"images": []}
-
-class LinkedInPostRequest(BaseModel):
-    linkedin_id: str
-    author_urn: str
-    text: str
-    image_url: Optional[str] = None
-
-@app.post("/api/linkedin/post")
-async def post_to_linkedin(payload: LinkedInPostRequest):
-    try:
-        res = supabase.table("social_tokens").select("access_token")\
-            .eq("user_email", f"linkedin_{payload.linkedin_id}")\
-            .execute()
-
-        if not res.data:
-            raise HTTPException(401, "LinkedIn not connected")
-
-        token = res.data[0]['access_token']
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "X-Restli-Protocol-Version": "2.0.0"
-        }
-
-        target_urn = payload.author_urn if payload.author_urn else f"urn:li:person:{payload.linkedin_id}"
-
-        media_asset_urn = None
-
-        if payload.image_url:
-            print(f"Processing image for LinkedIn: {payload.image_url}")
-
-            try:
-                img_resp = requests.get(payload.image_url, timeout=15)
-
-                if img_resp.status_code != 200:
-                    print(f"❌ Image Download Failed: {img_resp.status_code} - {img_resp.text[:100]}")
-                    raise HTTPException(status_code=400, detail=f"Could not download image from Vault. Status: {img_resp.status_code}")
-
-                img_content = img_resp.content
-
-                if len(img_content) < 100:
-                    raise HTTPException(status_code=400, detail="Image file is too small or empty.")
-            
-            except Exception as e:
-                print(f"Image Fetch Error: {e}")
-                raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
-
-            reg_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
-            reg_body = {
-                "registerUploadRequest": {
-                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-                    "owner": target_urn,
-                    "serviceRelationships": [{
-                        "relationshipType": "OWNER",
-                        "identifier": "urn:li:userGeneratedContent"
-                    }]
-                }
-            }
-
-            reg_res = requests.post(reg_url, headers=headers, json=reg_body)
-
-            if reg_res.status_code != 200:
-                print(f"Register Error: {reg_res.text}")
-
-                raise HTTPException(400, f"Image Reg Failed: {reg_res.text}")
-
-            upload_data = reg_res.json()
-            upload_url = upload_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
-            asset = upload_data['value']['asset']
-
-            # try:
-            #     img_content = requests.get(payload.image_url).content
-            
-            # except Exception as e:
-            #     raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
-
-            # upload_headers = {"Authorization": f"Bearer {token}"}
-
-            print(f"Uploading {len(img_content)} bytes to LinkedIn...")
-            put_res = requests.put(upload_url, data=img_content, headers={"Content-Type": "application/octet-stream"})
-
-            if put_res.status_code not in [200, 201]:
-                print(f"Binary Upload Failed: {put_res.text}")
-
-                raise HTTPException(status_code=500, detail="Failed to upload image binary to LinkedIn.")
-
-            media_asset_urn = asset
-            
-            print(f"Image uploaded successfully. Asset: {asset}")
-
-        post_data = {
-            "author": target_urn,
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary": {
-                        "text": payload.text
-                    },
-                    "shareMediaCategory": "IMAGE" if media_asset_urn else "NONE",
-                    "media": [{
-                        "status": "READY",
-                        "description": {"text": "Shared via AfterGlow"},
-                        "media": media_asset_urn,
-                        "title": {"text": "Image"}
-                    }] if media_asset_urn else []
-                }
-            },
-            "visibility": {
-                "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-            }
-        }
-
-        if not media_asset_urn:
-            post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = []
-            post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "NONE"
-
-        response = requests.post(
-            "https://api.linkedin.com/v2/ugcPosts",
-            headers=headers,
-            json=post_data
-        )
-
-        if response.status_code != 201:
-            print(f"LinkedIn Create Error: {response.text}")
-            raise HTTPException(400, f"LinkedIn Error: {response.text}")
-
-        return {"status": "success", "post_id": response.json().get("id")}
-
-    except HTTPException as he:
-        raise he
-        
     except Exception as e:
         print(f"Posting Error: {e}")
         raise HTTPException(500, str(e))
