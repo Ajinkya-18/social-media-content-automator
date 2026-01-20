@@ -3,203 +3,201 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useUser } from "@clerk/nextjs";
+import { useCredits } from "../../components/CreditsContext"; // Ensure this path matches your project structure
 import { 
   LayoutDashboard, Users, Eye, Video, Activity, ExternalLink, 
-  Loader2, LogOut, Wand2, X, Image as ImageIcon, 
+  Loader2, LogOut, Wand2, X, Image as ImageIcon, Youtube,
   Instagram, Flame, ArrowRight, Target, RefreshCw, PieChart,
-  TrendingUp, Palette, Linkedin // Imported Linkedin
+  TrendingUp, Palette, Linkedin, MousePointer, Clock, BarChart3
 } from "lucide-react";
+
+// --- COMPONENTS ---
+
+function StatCard({ icon, label, value, subtext, color }: { icon: any, label: string, value: string, subtext?: string, color?: string }) {
+    return (
+        <div className="glass-panel p-6 rounded-xl border border-white/5 flex items-start gap-5 hover:border-white/10 hover:bg-white/5 transition-all group relative overflow-hidden bg-[#0b1121]">
+            <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity ${color}`}>
+               {icon}
+            </div>
+            <div className={`w-12 h-12 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 ${color?.replace('text-', 'text-opacity-80 ')}`}>
+                {icon}
+            </div>
+            <div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">{label}</p>
+                <h4 className="text-2xl font-bold text-white group-hover:text-cyan-50 transition-colors">{value}</h4>
+                {subtext && <p className="text-[10px] text-slate-500 mt-1">{subtext}</p>}
+            </div>
+        </div>
+    )
+}
 
 function DashboardContent() {
   const { user } = useUser();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<any>(null);
-  const [videos, setVideos] = useState<any[]>([]);
-  const [email, setEmail] = useState<string | null>(null);
+  const { credits, tier } = useCredits();
+  const [activeTab, setActiveTab] = useState("overview");
+  const searchParams = useSearchParams();
+  const router = useRouter();
   
-  // --- INTELLIGENCE STATE ---
-  const [intelligence, setIntelligence] = useState<any>(null);
+  // --- STATE ---
+  const [loading, setLoading] = useState(false);
+  
+  // YouTube
+  const [ytStats, setYtStats] = useState<any>(null);
+  const [videos, setVideos] = useState<any[]>([]);
+  const [ytEmail, setYtEmail] = useState<string | null>(null);
+  const [intelligence, setIntelligence] = useState<any>(null); // Color Psychographics
 
-  // --- BRIDGE STATE ---
+  // LinkedIn
+  const [liStats, setLiStats] = useState<any>(null);
+  const [liCompanies, setLiCompanies] = useState<any[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<string>("");
+  const [liLoading, setLiLoading] = useState(false);
+  const [liConnected, setLiConnected] = useState(false);
+
+  // Instagram
+  const [instaStats, setInstaStats] = useState<any>(null);
+  const [instaId, setInstaId] = useState<string | null>(null);
+
+  // TrendStream
+  const [niche, setNiche] = useState("");
+  const [trends, setTrends] = useState<any[]>([]);
+  const [loadingTrends, setLoadingTrends] = useState(false);
+  const [hasNiche, setHasNiche] = useState(false);
+
+  // Bridge (Thumbnail)
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [canvaDesigns, setCanvaDesigns] = useState<any[]>([]);
   const [loadingDesigns, setLoadingDesigns] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // --- INSTAGRAM STATE ---
-  const [instaStats, setInstaStats] = useState<any>(null);
-  const [instaId, setInstaId] = useState<string | null>(null);
-
-  // --- LINKEDIN STATE (NEW) ---
-  const [linkedinStats, setLinkedinStats] = useState<any>(null);
-  const [linkedinId, setLinkedinId] = useState<string | null>(null);
-
-  // --- TRENDSTREAM STATE ---
-  const [niche, setNiche] = useState("");
-  const [trends, setTrends] = useState<any[]>([]);
-  const [loadingTrends, setLoadingTrends] = useState(false);
-  const [hasNiche, setHasNiche] = useState(false);
-
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  
-  // Define API URL globally
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
-  // 1. AUTH CALLBACK CHECK (Insta & LinkedIn)
+  // --- 1. INITIALIZATION & AUTH CHECKS ---
   useEffect(() => {
-    // Instagram Check
-    const urlInstaId = searchParams.get('instagram_id');
-    if (urlInstaId) {
-        setInstaId(urlInstaId);
-        localStorage.setItem('insta_id', urlInstaId);
-        router.replace('/dashboard');
-    } else {
-        const stored = localStorage.getItem('insta_id');
-        if (stored) setInstaId(stored);
+    // Check Local Storage
+    const storedYt = localStorage.getItem('yt_email');
+    if (storedYt) setYtEmail(storedYt);
+
+    const storedLi = localStorage.getItem('linkedin_id');
+    if (storedLi) {
+        setLiConnected(true);
+        fetchLinkedinCompanies(storedLi);
     }
 
-    // LinkedIn Check (NEW)
-    // Note: Ensure your backend callback redirects with &linkedin_id=... if you need specific ID fetching
+    const storedInsta = localStorage.getItem('insta_id');
+    if (storedInsta) setInstaId(storedInsta);
+
+    // Check URL Params (Callbacks)
     const status = searchParams.get('status');
     const provider = searchParams.get('provider');
-    const urlLinkedinId = searchParams.get('linkedin_id'); // Optional if backend sends it
+    const emailParam = searchParams.get('email');
+    const liIdParam = searchParams.get('linkedin_id');
+    const instaIdParam = searchParams.get('instagram_id');
 
-    if (status === 'connected' && provider === 'linkedin') {
-        // If the backend sends an ID, store it. Otherwise, we just mark as connected for this session.
-        if (urlLinkedinId) {
-            setLinkedinId(urlLinkedinId);
-            localStorage.setItem('linkedin_id', urlLinkedinId);
-        } else {
-            // Fallback: If no ID returned, we might just assume connected or retry fetch
-            // For now, we'll try to fetch with a placeholder or email if backend supports it
-             localStorage.setItem('linkedin_connected', 'true');
+    if (status === 'connected') {
+        if (emailParam) { // YouTube
+            setYtEmail(emailParam);
+            localStorage.setItem('yt_email', emailParam);
         }
-        alert("LinkedIn Connected Successfully!");
+        if (provider === 'linkedin' && liIdParam) { // LinkedIn
+            setLiConnected(true);
+            localStorage.setItem('linkedin_id', liIdParam);
+            fetchLinkedinCompanies(liIdParam);
+        }
+        if (instaIdParam) { // Instagram
+            setInstaId(instaIdParam);
+            localStorage.setItem('insta_id', instaIdParam);
+        }
+        // Clean URL
         router.replace('/dashboard');
-    } else {
-        const storedLi = localStorage.getItem('linkedin_id');
-        if (storedLi) setLinkedinId(storedLi);
     }
   }, [searchParams, router]);
 
-  // 2. FETCH SOCIAL STATS
+  // --- 2. DATA FETCHING ---
+  
+  // Fetch YouTube Data
+  useEffect(() => {
+    if (ytEmail) fetchYoutubeData();
+  }, [ytEmail]);
+
+  // Fetch Instagram Data
   useEffect(() => {
     if (instaId) fetchInstaStats();
-    if (linkedinId) fetchLinkedinStats();
-  }, [instaId, linkedinId]);
+  }, [instaId]);
+
+  const fetchYoutubeData = async () => {
+      setLoading(true);
+      try {
+          // 1. Stats (New format)
+          const statsRes = await fetch(`${apiUrl}/api/analytics/youtube?email=${ytEmail}`);
+          if (statsRes.ok) setYtStats(await statsRes.json());
+
+          // 2. Recent Videos
+          const videosRes = await fetch(`${apiUrl}/youtube/videos?email=${ytEmail}`);
+          if (videosRes.ok) setVideos(await videosRes.json());
+
+          // 3. Intelligence (Colors)
+          const intRes = await fetch(`${apiUrl}/api/analytics/intelligence?email=${ytEmail}`);
+          if (intRes.ok) {
+              const data = await intRes.json();
+              setIntelligence(data.analysis || data); 
+          }
+      } catch (e) { console.error("YT Fetch Error", e); }
+      finally { setLoading(false); }
+  };
+
+  const fetchLinkedinCompanies = async (id: string) => {
+      try {
+          const res = await fetch(`${apiUrl}/api/linkedin/companies?linkedin_id=${id}`);
+          const data = await res.json();
+          if (data.companies && data.companies.length > 0) {
+              setLiCompanies(data.companies);
+              setSelectedCompany(data.companies[0].id); // Default to first
+              fetchLinkedinStats(id, data.companies[0].id);
+          }
+      } catch (e) { console.error("LI Companies Error", e); }
+  };
+
+  const fetchLinkedinStats = async (id: string, urn: string) => {
+      setLiLoading(true);
+      try {
+          const res = await fetch(`${apiUrl}/api/analytics/linkedin?linkedin_id=${id}&company_urn=${urn}`);
+          if (res.ok) setLiStats(await res.json());
+      } catch (e) { console.error("LI Stats Error", e); }
+      finally { setLiLoading(false); }
+  };
 
   const fetchInstaStats = async () => {
-    try {
-        const res = await fetch(`${apiUrl}/instagram/stats?instagram_id=${instaId}`);
-        if (res.ok) {
-            setInstaStats(await res.json());
-        }
-    } catch (e) {
-        console.error("IG Fetch Error", e);
-    }
-  };
-
-  const fetchLinkedinStats = async () => {
       try {
-          const res = await fetch(`${apiUrl}/api/analytics/linkedin?linkedin_id=${linkedinId}`);
-          if (res.ok) {
-              setLinkedinStats(await res.json());
-          }
-      } catch (e) {
-          console.error("LinkedIn Fetch Error", e);
-      }
+          const res = await fetch(`${apiUrl}/instagram/stats?instagram_id=${instaId}`);
+          if (res.ok) setInstaStats(await res.json());
+      } catch (e) { console.error("IG Fetch Error", e); }
   };
 
-  const handleInstaDisconnect = () => {
-      localStorage.removeItem('insta_id');
-      setInstaStats(null);
-      setInstaId(null);
+  // --- 3. HANDLERS ---
+
+  const handleCompanyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const urn = e.target.value;
+      setSelectedCompany(urn);
+      const liId = localStorage.getItem('linkedin_id');
+      if (liId) fetchLinkedinStats(liId, urn);
   };
 
-  const handleLinkedinDisconnect = () => {
-      localStorage.removeItem('linkedin_id');
-      localStorage.removeItem('linkedin_connected');
-      setLinkedinStats(null);
-      setLinkedinId(null);
-  };
-
-  const handleConnectLinkedIn = () => {
-      window.location.href = `${apiUrl}/auth/linkedin/login`;
-  };
-
-  // 3. YOUTUBE AUTH CHECK
-  useEffect(() => {
-    const urlEmail = searchParams.get('email');
-    if (urlEmail) {
-      setEmail(urlEmail);
-      localStorage.setItem('yt_email', urlEmail);
-      router.replace('/dashboard');
-    } else {
-      const storedEmail = localStorage.getItem('yt_email');
-      if (storedEmail) setEmail(storedEmail);
-      else setLoading(false);
-    }
-  }, [searchParams, router]);
-
-  // 4. FETCH YOUTUBE DATA
-  useEffect(() => {
-    if (email) fetchData();
-  }, [email]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [statsRes, videosRes] = await Promise.all([
-        fetch(`${apiUrl}/youtube/stats?email=${email}`),
-        fetch(`${apiUrl}/youtube/videos?email=${email}`)
-      ]);
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (videosRes.ok) setVideos(await videosRes.json());
-    } catch (error) {
-      console.error("Fetch error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user?.primaryEmailAddress?.emailAddress) {
-        fetchIntelligence();
-        checkNiche();
-    }
-  }, [user]);
-
-  const fetchIntelligence = async () => {
-      try {
-          const res = await fetch(`${apiUrl}/api/analytics/intelligence?email=${user?.primaryEmailAddress?.emailAddress}`);
-          const data = await res.json();
-          setIntelligence(data.analysis);
-      } catch (e) { console.error(e); }
-  };
-
-  const checkNiche = async () => {
-      // Logic to check if niche is set
-  };
-
-  const handleSetNiche = async () => {
-      if (!niche || !user?.primaryEmailAddress?.emailAddress) return;
-      try {
-          await fetch(`${apiUrl}/api/trends/set-niche`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: user.primaryEmailAddress.emailAddress, niche })
-          });
-          setHasNiche(true);
-          generateTrends();
-      } catch (e) { console.error(e); }
-  };
-
-  const generateTrends = async () => {
+  const handleTrendGen = async () => {
       if (!user?.primaryEmailAddress?.emailAddress) return;
       setLoadingTrends(true);
       try {
+          // If niche hasn't been set in backend, set it first
+          if (niche && !hasNiche) {
+             await fetch(`${apiUrl}/api/trends/set-niche`, {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ email: user.primaryEmailAddress.emailAddress, niche })
+             });
+             setHasNiche(true);
+          }
+          
           const res = await fetch(`${apiUrl}/api/trends/generate`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -211,453 +209,301 @@ function DashboardContent() {
       finally { setLoadingTrends(false); }
   };
 
-  const handleUseTrend = (title: string) => {
-      router.push(`/writer?prompt=${encodeURIComponent(title)}`);
-  };
-
-  const handleLogout = () => {
-    if (confirm("Disconnect YouTube?")) {
-        localStorage.removeItem('yt_email');
-        setEmail(null);
-        setStats(null);
-        setVideos([]);
-        router.refresh();
-    }
-  };
-
-  // --- BRIDGE FUNCTIONS ---
   const openThumbnailPicker = async (videoId: string) => {
     setSelectedVideo(videoId);
     setPickerOpen(true);
+    const canvaId = localStorage.getItem('canva_id'); // Assuming stored from Studio
     
-    const canvaId = localStorage.getItem('canva_id');
-    if (!canvaId) {
-        alert("Please connect Canva in the Studio tab first.");
-        setPickerOpen(false);
-        return;
-    }
-
-    if (canvaDesigns.length === 0) {
+    if (canvaDesigns.length === 0 && canvaId) {
         setLoadingDesigns(true);
         try {
             const res = await fetch(`${apiUrl}/canva/designs?canva_id=${canvaId}`);
             const data = await res.json();
             if (data.items) setCanvaDesigns(data.items);
-        } catch (e) {
-            console.error("Canva fetch error", e);
-        } finally {
-            setLoadingDesigns(false);
-        }
+        } catch (e) { console.error(e); } 
+        finally { setLoadingDesigns(false); }
     }
   };
 
   const applyThumbnail = async (designId: string) => {
-    const canvaId = localStorage.getItem('canva_id');
-    if (!email || !selectedVideo || !canvaId) return;
-
-    setProcessingId(designId);
-
-    try {
-        const res = await fetch(`${apiUrl}/bridge/thumbnail`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                video_id: selectedVideo,
-                canva_design_id: designId,
-                youtube_email: email,
-                canva_user_id: canvaId
-            })
-        });
-
-        const result = await res.json();
-        
-        if (res.ok) {
-            alert("Success! Thumbnail updated on YouTube.");
-            setPickerOpen(false);
-            fetchData(); 
-        } else {
-            alert(`Error: ${result.detail || 'Upload failed'}`);
-        }
-
-    } catch (error) {
-        alert("Failed to connect to server");
-    } finally {
-        setProcessingId(null);
-    }
+      const canvaId = localStorage.getItem('canva_id');
+      if (!ytEmail || !selectedVideo || !canvaId) return;
+      setProcessingId(designId);
+      try {
+          const res = await fetch(`${apiUrl}/bridge/thumbnail`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ video_id: selectedVideo, canva_design_id: designId, youtube_email: ytEmail, canva_user_id: canvaId })
+          });
+          if (res.ok) { alert("Thumbnail Updated!"); setPickerOpen(false); fetchYoutubeData(); }
+          else { alert("Update failed."); }
+      } catch (e) { console.error(e); }
+      finally { setProcessingId(null); }
   };
 
-  if (!email) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-in fade-in duration-500">
-        <h2 className="text-2xl font-bold text-white">Connect YouTube</h2>
-        <button
-            onClick={() => window.location.href = `${apiUrl}/auth/youtube/login`}
-            className="px-8 py-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-full font-bold transition-all flex items-center gap-2 shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:scale-105"
-        >
-            <Video className="w-5 h-5" /> Sync Channel
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 relative">
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 relative pb-20">
       
-      {/* Header */}
-      <div className="border-b border-white/5 pb-6 flex justify-between items-end">
+      {/* HEADER & CREDITS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
         <div>
-          <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            <LayoutDashboard className="text-cyan-400 w-8 h-8" />
-            Command Center
-          </h2>
-          <p className="text-slate-400 mt-1">Live analytics from {stats?.channel_name || 'YouTube'}</p>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <LayoutDashboard className="text-cyan-400 w-8 h-8" />
+                Command Center
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">Multi-platform analytics & intelligence.</p>
         </div>
         
-        <div className="flex items-center gap-3">
-            {/* LinkedIn Connect Button (NEW) */}
-            {!linkedinStats ? (
-                 <button 
-                    onClick={handleConnectLinkedIn}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-400 rounded-lg hover:bg-blue-600 hover:text-white transition-colors border border-blue-600/20"
-                 >
-                    <Linkedin className="w-4 h-4" />
-                    <span>Connect LinkedIn</span>
-                 </button>
-            ) : (
-                <button onClick={handleLinkedinDisconnect} className="flex items-center gap-2 px-4 py-2 bg-white/5 text-slate-400 rounded-lg hover:text-white transition-colors border border-white/5">
-                    <Linkedin className="w-4 h-4" />
-                    <span>{linkedinStats.profile?.name || 'LinkedIn'}</span>
-                </button>
-            )}
-
-            {/* YouTube Disconnect */}
-            {email && (
-            stats ? (
-                <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-full hover:bg-orange-500/10 transition-colors group border border-white/5 hover:border-orange-500/30">
-                    <span className="text-sm font-medium text-white group-hover:text-orange-400 transition-colors">{stats.channel_name}</span>
-                    <img src={stats.thumbnail} alt="Channel" className="w-8 h-8 rounded-full ring-2 ring-transparent group-hover:ring-orange-500/50 transition-all" />
-                    <LogOut className="w-4 h-4 text-slate-500 group-hover:text-orange-500 transition-colors" />
-                </button>
-            ) : (
-                <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500 hover:text-white transition-colors">
-                    <LogOut className="w-4 h-4" />
-                    <span>Disconnect</span>
-                </button>
-            )
-            )}
+        {/* GLOBAL CREDITS BADGE */}
+        <div className="flex items-center gap-4 bg-[#0b1121] border border-white/10 px-5 py-2.5 rounded-xl shadow-lg">
+            <div className="text-right">
+                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{tier || 'Free'} Plan</div>
+                <div className="text-sm font-mono text-orange-400 flex items-center gap-2 justify-end">
+                    <span className="font-bold text-lg">{credits || 0}</span> Credits
+                </div>
+            </div>
+            <div className="h-10 w-10 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+                <Activity className="w-5 h-5" />
+            </div>
         </div>
       </div>
 
-      {loading && !stats ? (
-         <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-orange-500 animate-spin"/></div>
-      ) : (
-        <>
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard icon={<Users className="text-cyan-400" />} label="Subscribers" value={parseInt(stats?.subscribers || '0').toLocaleString()} />
-            <StatCard icon={<Eye className="text-blue-400" />} label="Total Views" value={parseInt(stats?.views || '0').toLocaleString()} />
-            <StatCard icon={<Video className="text-orange-400" />} label="Total Videos" value={stats?.video_count || '0'} />
-            
-            {/* LinkedIn Card (NEW) */}
-            <div className="glass-panel p-6 rounded-xl border border-white/5 flex items-center gap-5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all group relative overflow-hidden">
-                <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Linkedin className="text-blue-400 w-6 h-6" />
-                </div>
-                <div>
-                    <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">LinkedIn Network</p>
-                    <h4 className="text-3xl font-bold text-white mt-1 group-hover:text-blue-100 transition-colors">
-                        {linkedinStats ? "Active" : "--"}
-                    </h4>
-                </div>
-                {!linkedinStats && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={handleConnectLinkedIn} className="text-xs font-bold text-white bg-blue-600 px-3 py-1 rounded-full">Connect</button>
-                    </div>
-                )}
-            </div>
-          </div>
+      {/* TABS NAVIGATION */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          {[
+              { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+              { id: 'youtube', label: 'YouTube Studio', icon: Youtube },
+              { id: 'linkedin', label: 'LinkedIn Intelligence', icon: Linkedin },
+              { id: 'instagram', label: 'Instagram', icon: Instagram },
+          ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap rounded-t-lg
+                    ${activeTab === tab.id 
+                        ? 'border-cyan-500 text-white bg-white/5' 
+                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5'}
+                `}
+              >
+                  <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-cyan-400' : ''}`} /> {tab.label}
+              </button>
+          ))}
+      </div>
 
-          {/* --- DATA MOAT: PSYCHOGRAPHICS --- */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Chart Area */}
-            <div className="lg:col-span-2 bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <Palette className="w-5 h-5 text-purple-500" />
-                            Color Psychographics
-                        </h3>
-                        <p className="text-xs text-slate-400">Correlation between thumbnail color and views.</p>
-                    </div>
-                    {intelligence && (
-                        <div className="text-right">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-widest">Winning Color</p>
-                            <div className="flex items-center justify-end gap-2">
-                                <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: intelligence.best_performing_color }} />
-                                <span className="text-sm font-bold text-white">{intelligence.best_performing_color}</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* The Scatter Visualization */}
-                <div className="h-[200px] w-full flex items-end justify-between gap-2 px-4 border-b border-white/5 pb-4">
-                    {intelligence?.data.map((item: any, i: number) => {
-                        const maxViews = Math.max(...intelligence.data.map((d: any) => d.views));
-                        const height = (item.views / maxViews) * 100;
-                        
-                        return (
-                            <div key={i} className="group relative flex flex-col items-center gap-2 w-full">
-                                <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap z-10 border border-white/10">
-                                    <div className="font-bold">{item.views.toLocaleString()} Views</div>
-                                    <div className="opacity-70 max-w-[150px] truncate">{item.title}</div>
-                                </div>
-                                <div 
-                                    className="w-full max-w-[30px] rounded-t-lg transition-all duration-500 hover:brightness-125 cursor-pointer relative"
-                                    style={{ 
-                                        height: `${height}%`, 
-                                        backgroundColor: item.color,
-                                        boxShadow: `0 0 20px ${item.color}40` 
-                                    }}
-                                >
-                                    <div className="absolute top-0 w-full h-1 bg-white/20" />
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-                <div className="flex justify-between text-[10px] text-slate-600 mt-2 font-mono uppercase">
-                    <span>Recent Uploads</span>
-                    <span>(Left to Right)</span>
-                </div>
-            </div>
-
-            {/* Insight Panel */}
-            <div className="bg-gradient-to-br from-purple-900/10 to-transparent border border-purple-500/20 rounded-2xl p-6 flex flex-col justify-center relative overflow-hidden">
-                <div className="absolute -right-10 -top-10 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
-                
-                <h3 className="text-xl font-bold text-white mb-4 relative z-10">AI Insight</h3>
-                <p className="text-sm text-slate-300 leading-relaxed relative z-10 mb-6">
-                    "Your audience responds <strong>40% better</strong> to thumbnails with <span style={{color: intelligence?.best_performing_color || '#fff'}}>High Contrast & Warm Tones</span>. Consider switching your next video's palette."
-                </p>
-                
-                <button className="py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-2">
-                    <TrendingUp className="w-4 h-4" /> Apply to Next Video
-                </button>
-            </div>
-
-        </div>
-
-          {/* --- TRENDSTREAM WIDGET --- */}
-          <div className="glass-panel p-8 rounded-2xl border border-white/5 bg-gradient-to-br from-orange-900/10 to-transparent relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Flame className="w-32 h-32 text-orange-500" />
+      {/* --- TAB CONTENT: OVERVIEW --- */}
+      {activeTab === 'overview' && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 fade-in duration-500">
+              
+              {/* Summary Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* YouTube Summary */}
+                  <StatCard 
+                    icon={<Eye className="w-6 h-6 text-red-400"/>} 
+                    label="YT Views (30d)" 
+                    value={ytStats?.overview?.views?.toLocaleString() || "--"} 
+                    color="text-red-400"
+                  />
+                  <StatCard 
+                    icon={<Users className="w-6 h-6 text-red-400"/>} 
+                    label="Subscribers" 
+                    value={ytStats?.overview?.total_subs?.toLocaleString() || "--"} 
+                    color="text-red-400"
+                  />
+                  
+                  {/* LinkedIn Summary */}
+                  <StatCard 
+                    icon={<BarChart3 className="w-6 h-6 text-blue-400"/>} 
+                    label="LI Impressions" 
+                    value={liStats?.overview?.impressions?.toLocaleString() || "--"} 
+                    color="text-blue-400"
+                  />
+                  <StatCard 
+                    icon={<MousePointer className="w-6 h-6 text-blue-400"/>} 
+                    label="LI Clicks" 
+                    value={liStats?.overview?.clicks?.toLocaleString() || "--"} 
+                    color="text-blue-400"
+                  />
               </div>
 
-              <div className="relative z-10">
-                  <h3 className="text-2xl font-bold text-white flex items-center gap-2 mb-2">
-                      <Flame className="w-6 h-6 text-orange-500 fill-orange-500" /> 
-                      TrendStream
-                  </h3>
-                  <p className="text-slate-400 mb-6 max-w-xl">
-                      AI-powered ideation engine. Stop staring at a blank page.
-                  </p>
+              {/* TrendStream Widget (Ideation) */}
+              <div className="glass-panel p-8 rounded-2xl border border-white/5 bg-gradient-to-br from-orange-900/10 to-transparent relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <Flame className="w-32 h-32 text-orange-500" />
+                  </div>
+                  <div className="relative z-10">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+                          <Flame className="w-5 h-5 text-orange-500 fill-orange-500" /> TrendStream Engine
+                      </h3>
+                      <p className="text-slate-400 text-sm mb-6 max-w-xl">AI-powered ideation. Generate viral concepts based on your niche.</p>
 
-                  {!hasNiche && trends.length === 0 ? (
-                      <div className="flex items-center gap-4 max-w-md">
-                          <div className="relative flex-1">
-                              <Target className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                              <input 
-                                  type="text" 
-                                  value={niche}
-                                  onChange={(e) => setNiche(e.target.value)}
-                                  placeholder="Enter your niche (e.g., 'Tech', 'Cooking')"
-                                  className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:border-orange-500 outline-none transition-all"
-                              />
+                      <div className="flex flex-wrap gap-4 items-end mb-6">
+                          <div className="flex-1 min-w-[200px]">
+                              <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Your Niche</label>
+                              <div className="relative">
+                                  <Target className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                                  <input 
+                                      type="text" 
+                                      value={niche}
+                                      onChange={(e) => setNiche(e.target.value)}
+                                      placeholder="e.g. 'SaaS Marketing', 'Vegan Cooking'"
+                                      className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white focus:border-orange-500 outline-none transition-all text-sm"
+                                  />
+                              </div>
                           </div>
-                          <button 
-                              onClick={handleSetNiche}
-                              className="px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold transition-all"
-                          >
-                              Start
+                          <button onClick={handleTrendGen} disabled={loadingTrends || !niche} className="px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold transition-all text-sm flex items-center gap-2 disabled:opacity-50">
+                              {loadingTrends ? <Loader2 className="w-4 h-4 animate-spin"/> : <RefreshCw className="w-4 h-4"/>} 
+                              Generate Ideas
                           </button>
                       </div>
-                  ) : (
-                      <div className="space-y-4">
-                          {loadingTrends ? (
-                              <div className="flex items-center gap-3 text-orange-400 animate-pulse">
-                                  <Loader2 className="w-5 h-5 animate-spin" />
-                                  <span className="font-mono text-sm">SCANNING THE ETHER...</span>
-                              </div>
-                          ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  {trends.map((trend, i) => (
-                                      <div key={i} className="bg-black/40 border border-white/5 p-5 rounded-xl hover:border-orange-500/50 transition-all group flex flex-col">
-                                          <div className="flex justify-between items-start mb-3">
-                                              <span className="text-[10px] font-bold px-2 py-1 bg-white/5 rounded text-slate-400 uppercase tracking-wider">{trend.type}</span>
-                                              <button 
-                                                  onClick={() => handleUseTrend(trend.title)}
-                                                  className="p-1.5 bg-orange-500/10 text-orange-400 rounded-lg hover:bg-orange-500 hover:text-white transition-colors"
-                                                  title="Write this Script"
-                                              >
-                                                  <Wand2 className="w-4 h-4" />
-                                              </button>
-                                          </div>
-                                          <h4 className="text-white font-bold leading-tight mb-2 group-hover:text-orange-100">{trend.title}</h4>
-                                          <p className="text-xs text-slate-500 mt-auto">{trend.angle}</p>
+
+                      {trends.length > 0 && (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {trends.map((trend, i) => (
+                                  <div key={i} className="bg-black/40 border border-white/5 p-5 rounded-xl hover:border-orange-500/50 transition-all group flex flex-col">
+                                      <div className="flex justify-between items-start mb-3">
+                                          <span className="text-[10px] font-bold px-2 py-1 bg-white/5 rounded text-slate-400 uppercase tracking-wider">{trend.type}</span>
+                                          <button onClick={() => router.push(`/writer?prompt=${encodeURIComponent(trend.title)}`)} className="p-1.5 bg-orange-500/10 text-orange-400 rounded-lg hover:bg-orange-500 hover:text-white transition-colors" title="Create Script"><Wand2 className="w-3 h-3" /></button>
                                       </div>
-                                  ))}
-                              </div>
-                          )}
-                          
-                          {!loadingTrends && trends.length > 0 && (
-                              <div className="flex justify-end">
-                                  <button 
-                                      onClick={generateTrends}
-                                      className="text-xs font-bold text-slate-500 hover:text-white flex items-center gap-1"
-                                  >
-                                      <RefreshCw className="w-3 h-3" /> Refresh Ideas
-                                  </button>
-                              </div>
-                          )}
-                      </div>
-                  )}
+                                      <h4 className="text-white font-bold text-sm leading-snug mb-2 group-hover:text-orange-100">{trend.title}</h4>
+                                      <p className="text-[10px] text-slate-500 mt-auto">{trend.angle}</p>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
               </div>
           </div>
-
-          {/* Recent Videos List */}
-          <div className="glass-panel rounded-2xl p-8 border border-white/5 bg-slate-900/50">
-            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-orange-400" /> Recent Uploads
-            </h3>
-            <div className="space-y-4">
-                {videos.map((video) => (
-                    <div key={video.id} className="flex flex-col sm:flex-row gap-4 items-start sm:items-center p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group border border-transparent hover:border-white/5">
-                        <div className="relative w-40 aspect-video rounded-lg overflow-hidden bg-slate-800 shadow-lg">
-                            <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h4 className="text-white font-medium truncate text-lg group-hover:text-cyan-400 transition-colors">{video.title}</h4>
-                            <p className="text-slate-400 text-xs mt-1">Published: {new Date(video.published_at).toLocaleDateString()}</p>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                            <button 
-                                onClick={() => openThumbnailPicker(video.id)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500 hover:text-white rounded-lg transition-all text-xs font-bold border border-orange-500/20"
-                            >
-                                <Wand2 className="w-3 h-3" /> Update Thumbnail
-                            </button>
-                            
-                            <a href={`https://youtu.be/${video.id}`} target="_blank" className="p-2 text-slate-500 hover:text-white transition-colors" rel="noreferrer"><ExternalLink className="w-4 h-4" /></a>
-                        </div>
-                    </div>
-                ))}
-            </div>
-          </div>
-        </>
       )}
 
-      {/* --- INSTAGRAM SECTION --- */}
-      <div className="mt-12 border-t border-white/5 pt-8">
-          <div className="flex justify-between items-end mb-6">
-              <div>
-                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
-                    <Instagram className="text-purple-400 w-8 h-8" />
-                    Instagram Analytics
-                </h3>
-                <p className="text-slate-400 mt-1">
-                    {instaStats ? `Stats for @${instaStats.username}` : 'Connect your Business Account'}
-                </p>
-              </div>
-
-              {!instaId ? (
-                  <button
-                    onClick={() => window.location.href = `${apiUrl}/auth/instagram/login`}
-                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white rounded-lg font-bold transition-all flex items-center gap-2 shadow-lg shadow-purple-900/20"
-                  >
-                      <Instagram className="w-5 h-5" /> Connect Instagram
-                  </button>
+      {/* --- TAB CONTENT: YOUTUBE --- */}
+      {activeTab === 'youtube' && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 fade-in duration-500">
+              {!ytEmail ? (
+                  <div className="text-center py-20 bg-[#0b1121] rounded-3xl border border-white/5 border-dashed">
+                      <Youtube className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-white mb-2">Connect YouTube</h3>
+                      <button onClick={() => window.location.href = `${apiUrl}/auth/youtube/login`} className="px-6 py-2 mt-4 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold">Sync Channel</button>
+                  </div>
               ) : (
-                  <button onClick={handleInstaDisconnect} className="text-sm text-slate-500 hover:text-white underline decoration-slate-700 underline-offset-4">
-                      Disconnect
-                  </button>
+                  <>
+                    {/* YT Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <StatCard icon={<Eye/>} label="30-Day Views" value={ytStats?.overview?.views?.toLocaleString() || "0"} color="text-red-400" />
+                        <StatCard icon={<Clock/>} label="Watch Time" value={`${ytStats?.overview?.watch_time_hours || 0} hrs`} color="text-red-400" />
+                        <StatCard icon={<TrendingUp/>} label="Avg Likes" value={ytStats?.overview?.likes?.toLocaleString() || "0"} color="text-green-400" />
+                    </div>
+
+                    {/* Color Psychographics */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 bg-[#0b1121] border border-white/5 rounded-2xl p-6 relative">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2"><Palette className="w-5 h-5 text-purple-500"/> Color Psychographics</h3>
+                                {intelligence && <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: intelligence.best_performing_color}}/><span className="text-xs text-slate-400">Top Color</span></div>}
+                            </div>
+                            <div className="h-[200px] w-full flex items-end justify-between gap-2 px-2 border-b border-white/5 pb-4">
+                                {intelligence?.data?.map((item: any, i: number) => {
+                                    const max = Math.max(...intelligence.data.map((d: any) => d.views));
+                                    return (
+                                        <div key={i} className="group relative flex flex-col items-center w-full">
+                                            <div className="w-full max-w-[40px] rounded-t-sm transition-all hover:opacity-80" style={{height: `${(item.views/max)*100}%`, backgroundColor: item.color}}/>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                        {/* Bridge / Recent Videos */}
+                        <div className="bg-[#0b1121] border border-white/5 rounded-2xl p-6 h-full overflow-y-auto max-h-[400px] custom-scrollbar">
+                            <h3 className="text-lg font-bold text-white mb-4">Recent Uploads</h3>
+                            <div className="space-y-4">
+                                {videos.map(v => (
+                                    <div key={v.id} className="flex gap-3 items-center group">
+                                        <img src={v.thumbnail} alt={`Thumbnail for ${v.title}`} className="w-20 rounded-md opacity-70 group-hover:opacity-100 transition-opacity"/>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs text-white truncate font-medium">{v.title}</p>
+                                            <button onClick={() => openThumbnailPicker(v.id)} className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-1 mt-1"><Wand2 className="w-3 h-3"/> Edit Thumb</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                  </>
               )}
           </div>
+      )}
 
-          {instaStats && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
-                <StatCard 
-                    icon={<Users className="text-purple-400" />} 
-                    label="Followers" 
-                    value={instaStats.followers.toLocaleString()} 
-                />
-                <StatCard 
-                    icon={<ImageIcon className="text-cyan-400" />} 
-                    label="Total Posts" 
-                    value={instaStats.posts.toLocaleString()} 
-                />
-                <StatCard 
-                    icon={<Activity className="text-green-400" />} 
-                    label="Account Status" 
-                    value="Active" 
-                />
-            </div>
-          )}
-      </div>
+      {/* --- TAB CONTENT: LINKEDIN --- */}
+      {activeTab === 'linkedin' && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 fade-in duration-500">
+              {!liConnected ? (
+                  <div className="text-center py-20 bg-[#0b1121] rounded-3xl border border-white/5 border-dashed">
+                      <Linkedin className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-white mb-2">Connect LinkedIn</h3>
+                      <button onClick={() => window.location.href = `${apiUrl}/auth/linkedin/login`} className="px-6 py-2 mt-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold">Connect Page</button>
+                  </div>
+              ) : (
+                  <>
+                    <div className="flex justify-between items-center bg-[#0b1121] p-4 rounded-xl border border-white/5">
+                        <div className="flex items-center gap-3">
+                            <Linkedin className="w-6 h-6 text-blue-500" />
+                            <select value={selectedCompany} onChange={handleCompanyChange} aria-label="Select LinkedIn company" className="bg-black/40 border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none min-w-[200px]">
+                                {liCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <button onClick={() => { localStorage.removeItem('linkedin_id'); setLiConnected(false); }} className="text-xs text-red-400 hover:text-red-300">Disconnect</button>
+                    </div>
+
+                    {liStats ? (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <StatCard icon={<Eye/>} label="Impressions" value={liStats.overview?.impressions?.toLocaleString() || "0"} color="text-blue-400" />
+                            <StatCard icon={<MousePointer/>} label="Clicks" value={liStats.overview?.clicks?.toLocaleString() || "0"} color="text-purple-400" />
+                            <StatCard icon={<TrendingUp/>} label="Engagement" value={liStats.overview?.engagements?.toLocaleString() || "0"} color="text-green-400" />
+                            <StatCard icon={<Users/>} label="Likes" value={liStats.overview?.likes?.toLocaleString() || "0"} color="text-blue-400" />
+                        </div>
+                    ) : (
+                        <div className="text-center py-10 text-slate-500 flex flex-col items-center">
+                            {liLoading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : "Select a company to view intelligence."}
+                        </div>
+                    )}
+                  </>
+              )}
+          </div>
+      )}
+
+      {/* --- TAB CONTENT: INSTAGRAM --- */}
+      {activeTab === 'instagram' && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 fade-in duration-500">
+              {!instaId ? (
+                  <div className="text-center py-20 bg-[#0b1121] rounded-3xl border border-white/5 border-dashed">
+                      <Instagram className="w-12 h-12 text-pink-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-white mb-2">Connect Instagram</h3>
+                      <button onClick={() => window.location.href = `${apiUrl}/auth/instagram/login`} className="px-6 py-2 mt-4 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-bold">Connect Business Account</button>
+                  </div>
+              ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <StatCard icon={<Users/>} label="Followers" value={instaStats?.followers?.toLocaleString() || "0"} color="text-pink-400" />
+                      <StatCard icon={<ImageIcon/>} label="Media Count" value={instaStats?.posts?.toLocaleString() || "0"} color="text-purple-400" />
+                      <StatCard icon={<Activity/>} label="Status" value="Active" color="text-green-400" />
+                  </div>
+              )}
+          </div>
+      )}
 
       {/* --- THUMBNAIL PICKER MODAL --- */}
       {pickerOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[#0b1121] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl shadow-black/50">
+            <div className="bg-[#0b1121] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl">
                 <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                    <div>
-                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                            <ImageIcon className="text-orange-400 w-5 h-5" /> Select Canva Design
-                        </h3>
-                        <p className="text-slate-400 text-sm">Choose a design to use as your thumbnail</p>
-                    </div>
-                    <button onClick={() => setPickerOpen(false)} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
-                        <X className="w-6 h-6" />
-                    </button>
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2"><ImageIcon className="text-orange-400 w-5 h-5" /> Select Canva Design</h3>
+                    <button onClick={() => setPickerOpen(false)} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white" aria-label="Close thumbnail picker"><X className="w-6 h-6" /></button>
                 </div>
-
-                <div className="flex-1 overflow-y-auto p-6 bg-[#030712]">
-                    {loadingDesigns ? (
-                        <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                            <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-                            <p className="text-slate-500 font-mono text-sm">Fetching designs from Canva...</p>
-                        </div>
-                    ) : canvaDesigns.length === 0 ? (
-                        <div className="text-center py-20 text-slate-500">
-                            <p>No designs found. Create one in the Studio first!</p>
-                        </div>
-                    ) : (
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                    {loadingDesigns ? <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-orange-500 animate-spin"/></div> : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {canvaDesigns.map((design) => (
-                                <button 
-                                    key={design.id}
-                                    disabled={!!processingId}
-                                    onClick={() => applyThumbnail(design.id)}
-                                    className="group relative aspect-video bg-slate-800 rounded-lg overflow-hidden border border-white/5 hover:border-orange-500 transition-all text-left shadow-lg"
-                                >
-                                    {design.thumbnail?.url ? (
-                                        <img src={design.thumbnail.url} alt={design.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-slate-600" /></div>
-                                    )}
-                                    
-                                    {processingId === design.id && (
-                                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
-                                            <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
-                                            <span className="text-xs text-orange-400 font-bold tracking-widest">UPLOADING...</span>
-                                        </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                                        <span className="text-white text-sm font-bold truncate">{design.title}</span>
-                                        <span className="text-orange-400 text-xs mt-1">Click to Apply</span>
-                                    </div>
+                                <button key={design.id} disabled={!!processingId} onClick={() => applyThumbnail(design.id)} className="group relative aspect-video bg-slate-800 rounded-lg overflow-hidden border border-white/5 hover:border-orange-500 transition-all">
+                                    {design.thumbnail?.url ? <img src={design.thumbnail.url} alt={`Canva design thumbnail`} className="w-full h-full object-cover group-hover:scale-105 transition-transform"/> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="text-slate-600" /></div>}
+                                    {processingId === design.id && <div className="absolute inset-0 bg-black/80 flex items-center justify-center"><Loader2 className="w-8 h-8 text-orange-400 animate-spin"/></div>}
                                 </button>
                             ))}
                         </div>
@@ -671,27 +517,9 @@ function DashboardContent() {
   );
 }
 
-function StatCard({ icon, label, value }: { icon: any, label: string, value: string }) {
-    return (
-        <div className="glass-panel p-6 rounded-xl border border-white/5 flex items-center gap-5 hover:border-white/10 hover:bg-white/5 transition-all group">
-            <div className="w-14 h-14 rounded-full bg-white/5 border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                {icon}
-            </div>
-            <div>
-                <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">{label}</p>
-                <h4 className="text-3xl font-bold text-white mt-1 group-hover:text-cyan-100 transition-colors">{value}</h4>
-            </div>
-        </div>
-    )
-}
-
 export default function DashboardPage() {
   return (
-    <Suspense fallback={
-      <div className="flex justify-center items-center min-h-screen bg-black">
-        <Loader2 className="w-10 h-10 text-orange-500 animate-spin"/>
-      </div>
-    }>
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen bg-black"><Loader2 className="w-10 h-10 text-orange-500 animate-spin"/></div>}>
       <DashboardContent />
     </Suspense>
   );
