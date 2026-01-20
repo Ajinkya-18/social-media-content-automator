@@ -168,6 +168,13 @@ export default function RepurposerPage() {
       setIsPosting(true);
       const finalAuthorUrn = selectedAuthor || `urn:li:person:${linkedinId}`;
 
+      console.log("Sending Payload:", {
+          linkedin_id: linkedinId,
+          author_urn: finalAuthorUrn,
+          text: content,
+          image_url: selectedImage // <--- Check if this is null in your browser console
+      });
+
       try {
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/linkedin/post`, {
               method: 'POST',

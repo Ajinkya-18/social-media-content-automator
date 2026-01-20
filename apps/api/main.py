@@ -586,15 +586,17 @@ class LinkedInPostRequest(BaseModel):
 @app.post("/api/linkedin/post")
 async def post_to_linkedin(payload: LinkedInPostRequest):
     try:
+        # Debug Print: Check if image_url is actually arriving
+        print(f"📝 Received Post Request. Image URL: {payload.image_url}") 
+
         res = supabase.table("social_tokens").select("access_token")\
             .eq("user_email", f"linkedin_{payload.linkedin_id}")\
-                .execute()
-            
+            .execute()
+
         if not res.data:
             raise HTTPException(401, "LinkedIn not connected")
-        
-        token = res.data[0]['access_token']
 
+        token = res.data[0]['access_token']
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -603,6 +605,63 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
 
         target_urn = payload.author_urn if payload.author_urn else f"urn:li:person:{payload.linkedin_id}"
 
+        media_asset_urn = None
+
+        if payload.image_url:
+            print(f"Processing image for LinkedIn: {payload.image_url}")
+
+            try:
+                # 1. Download Image
+                img_resp = requests.get(payload.image_url, timeout=15)
+
+                if img_resp.status_code != 200:
+                    print(f"❌ Image Download Failed: {img_resp.status_code}")
+                    raise HTTPException(status_code=400, detail=f"Could not download image. Status: {img_resp.status_code}")
+
+                img_content = img_resp.content
+
+                if len(img_content) < 100:
+                    raise HTTPException(status_code=400, detail="Image file is too small or empty.")
+            
+            except Exception as e:
+                print(f"Image Fetch Error: {e}")
+                raise HTTPException(status_code=400, detail=f"Failed to fetch source image: {str(e)}")
+
+            # 2. Register Upload
+            reg_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
+            reg_body = {
+                "registerUploadRequest": {
+                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                    "owner": target_urn,
+                    "serviceRelationships": [{
+                        "relationshipType": "OWNER",
+                        "identifier": "urn:li:userGeneratedContent"
+                    }]
+                }
+            }
+
+            reg_res = requests.post(reg_url, headers=headers, json=reg_body)
+
+            if reg_res.status_code != 200:
+                print(f"Register Error: {reg_res.text}")
+                raise HTTPException(400, f"Image Reg Failed: {reg_res.text}")
+
+            upload_data = reg_res.json()
+            upload_url = upload_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
+            asset = upload_data['value']['asset']
+
+            # 3. Upload Binary (No Authorization Header)
+            print(f"Uploading {len(img_content)} bytes to LinkedIn...")
+            put_res = requests.put(upload_url, data=img_content, headers={"Content-Type": "application/octet-stream"})
+
+            if put_res.status_code not in [200, 201]:
+                print(f"Binary Upload Failed: {put_res.text}")
+                raise HTTPException(status_code=500, detail="Failed to upload image binary to LinkedIn.")
+
+            media_asset_urn = asset
+            print(f"Image uploaded successfully. Asset: {asset}")
+
+        # 4. Create Post
         post_data = {
             "author": target_urn,
             "lifecycleState": "PUBLISHED",
@@ -611,13 +670,25 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
                     "shareCommentary": {
                         "text": payload.text
                     },
-                    "shareMediaCategory": "NONE"
+                    "shareMediaCategory": "IMAGE" if media_asset_urn else "NONE",
+                    "media": [{
+                        "status": "READY",
+                        "description": {"text": "Shared via AfterGlow"},
+                        "media": media_asset_urn,
+                        "title": {"text": "Image"}
+                    }] if media_asset_urn else []
                 }
             },
             "visibility": {
                 "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
             }
         }
+
+        # Cleanup if no media
+        if not media_asset_urn:
+             # Ensure structure is clean for text-only
+            post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = []
+            post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "NONE"
 
         response = requests.post(
             "https://api.linkedin.com/v2/ugcPosts",
@@ -626,10 +697,13 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
         )
 
         if response.status_code != 201:
+            print(f"LinkedIn Create Error: {response.text}")
             raise HTTPException(400, f"LinkedIn Error: {response.text}")
 
         return {"status": "success", "post_id": response.json().get("id")}
 
+    except HTTPException as he:
+        raise he  
     except Exception as e:
         print(f"Posting Error: {e}")
         raise HTTPException(500, str(e))
@@ -755,7 +829,7 @@ async def post_to_linkedin(payload: LinkedInPostRequest):
             try:
                 img_resp = requests.get(payload.image_url, timeout=15)
 
-                if image_resp.status_code != 200:
+                if img_resp.status_code != 200:
                     print(f"❌ Image Download Failed: {img_resp.status_code} - {img_resp.text[:100]}")
                     raise HTTPException(status_code=400, detail=f"Could not download image from Vault. Status: {img_resp.status_code}")
 
