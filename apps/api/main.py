@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google.oauth2.credentials import Credentials
@@ -393,6 +393,34 @@ class ImageRequest(BaseModel):
     email: str
     prompt: str
     aspect_ratio: str = "16:9"
+
+class EnhancePromptRequest(BaseModel):
+    prompt: str
+
+@app.post("/api/enhance-prompt")
+async def enhance_prompt(req: EnhancePromptRequest):
+    try:
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert AI Art Prompt Engineer. Rewrite the user's concept into a highly detailed, descriptive prompt suitable for high-end image generators like Flux, Midjourney, or Google Imagen. Focus on lighting, composition, texture, camera settings, and artistic style. Output ONLY the prompt text, no introductions."
+                },
+                {
+                    "role": "user",
+                    "content": f"Enhance this concept: {req.prompt}",
+                }
+            ],
+            model="llama-3.1-8b-instant",
+        )
+
+        enhanced_text = chat_completion.choices[0].message.content
+        
+        return {"enhanced_prompt": enhanced_text}
+
+    except Exception as e:
+        print(f"Enhance Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/generate-image")
 async def generate_image(payload: ImageRequest):
@@ -808,4 +836,39 @@ async def get_vault_scripts(email:str):
     except Exception as e:
         print(f"Vault Script Error: {e}")
         return {"scripts": []}
+
+@app.post("/api/upload/image")
+async def upload_image(file: UploadFile = File(...), email: str = Form(...)):
+    try:
+        contents = await file.read()
+
+        safe_email = re.sub(r'[^a-zA-Z0-9]', '_', email)
+        filename = f"upload_{safe_email}_{int(time.time())}_{file.filename}"
+        bucket_name = "generated_images"
+
+        print(f"Uploading local file {filename}...")
+        supabase.storage.from_(bucket_name).upload(
+            path=filename,
+            file=contents,
+            file_options={"content-type": file.content_type}
+        )
+
+        public_url = supabase.storage.from_(bucket_name).get_public_url(filename)
+
+        supabase.table("assets").insert({
+            "user_email": email,
+            "asset_type": "image",
+            "content": public_url,
+            "metadata": {
+                "source": "device_upload", 
+                "filename": filename
+            }
+        }).execute()
+
+        return {"url": public_url}
+
+    except Exception as e:
+        print(f"Upload Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 

@@ -6,7 +6,7 @@ import { useCredits } from "../../components/CreditsContext";
 import { 
   Layers, Twitter, Linkedin, Instagram, Copy, Repeat, Loader2, 
   Sparkles, CalendarPlus, Check, Upload, PenTool, Send, ChevronDown, 
-  Building2, User, Coins, Image as ImageIcon, X, FileText 
+  Building2, User, Coins, Image as ImageIcon, X, FileText, UploadCloud 
 } from "lucide-react";
 
 export default function RepurposerPage() {
@@ -20,7 +20,8 @@ export default function RepurposerPage() {
   
   // Processing State
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false); // For Script Import
+  const [isImageUploading, setIsImageUploading] = useState(false); // For Image Upload
   const [isPosting, setIsPosting] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   
@@ -43,7 +44,9 @@ export default function RepurposerPage() {
   const [vaultScripts, setVaultScripts] = useState<any[]>([]);
   const [showScriptVault, setShowScriptVault] = useState(false); // Script Vault
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null); // For Scripts (.docx/.txt)
+  const imageInputRef = useRef<HTMLInputElement>(null); // For Images (.png/.jpg) - NEW
 
   // 1. FETCH COMPANIES (On Tab Change)
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function RepurposerPage() {
       }
   };
 
-  // 3. FETCH VAULT SCRIPTS (NEW)
+  // 3. FETCH VAULT SCRIPTS
   const handleOpenScriptVault = async () => {
       setShowScriptVault(true);
       if (vaultScripts.length === 0 && user?.primaryEmailAddress?.emailAddress) {
@@ -85,6 +88,35 @@ export default function RepurposerPage() {
   const handleSelectScript = (content: string) => {
       setInputContent(content);
       setShowScriptVault(false);
+  };
+
+  // --- NEW: HANDLE LOCAL IMAGE UPLOAD ---
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !user?.primaryEmailAddress?.emailAddress) return;
+
+      setIsImageUploading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("email", user.primaryEmailAddress.emailAddress);
+
+      try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload/image`, {
+              method: "POST",
+              body: formData
+          });
+          
+          if (!res.ok) throw new Error("Upload failed");
+          
+          const data = await res.json();
+          setSelectedImage(data.url); // Set as the active image for LinkedIn
+      } catch (error) {
+          console.error(error);
+          alert("Failed to upload image.");
+      } finally {
+          setIsImageUploading(false);
+          if (imageInputRef.current) imageInputRef.current.value = "";
+      }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,13 +232,14 @@ export default function RepurposerPage() {
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Source Script / Text</label>
                 
                 <div className="flex items-center gap-2">
-                    {/* NEW: From Vault Button */}
+                    {/* Script Vault Button */}
                     <button onClick={handleOpenScriptVault} className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs rounded-lg border border-purple-500/30 transition-all font-bold">
                         <FileText className="w-3 h-3" /> From Vault
                     </button>
 
                     <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
 
+                    {/* Script Import Button */}
                     <input type="file" ref={fileInputRef} className="hidden" accept=".txt,.md,.docx" onChange={handleFileUpload} />
                     <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 text-xs text-slate-300 rounded-lg border border-white/10 transition-all disabled:opacity-50">
                         {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />} Import
@@ -269,22 +302,34 @@ export default function RepurposerPage() {
                 />
             </div>
 
-            {/* Actions Footer - FIXED DROPDOWN CLIPPING */}
+            {/* Actions Footer */}
             <div className="p-4 border-t border-white/5 bg-black/20 flex flex-col lg:flex-row justify-between items-center gap-4 shrink-0">
                 <span className="text-xs text-slate-500 font-mono hidden lg:inline">
                     {results[activeTab as keyof typeof results]?.length || 0} chars
                 </span>
                 
-                {/* Changed overflow-x-auto to flex-wrap to prevent dropdown clipping */}
                 <div className="flex gap-2 w-full lg:w-auto flex-wrap justify-center lg:justify-end">
                     
                     {activeTab === 'linkedin' && (
-                        <button 
-                            onClick={handleOpenVault}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 border transition-all ${selectedImage ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
-                        >
-                           <ImageIcon className="w-3 h-3" /> {selectedImage ? "Change" : "Media"}
-                        </button>
+                        <div className="flex gap-2">
+                            {/* 1. VAULT BUTTON */}
+                            <button 
+                                onClick={handleOpenVault}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 border transition-all ${selectedImage ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'}`}
+                            >
+                               <ImageIcon className="w-3 h-3" /> {selectedImage ? "Change" : "Vault"}
+                            </button>
+
+                            {/* 2. LOCAL UPLOAD BUTTON (NEW) */}
+                            <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                            <button 
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={isImageUploading}
+                                className="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 border bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                            >
+                                {isImageUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />} Upload
+                            </button>
+                        </div>
                     )}
 
                     <button onClick={() => { navigator.clipboard.writeText(results[activeTab as keyof typeof results] || ""); setCopySuccess(true); setTimeout(() => setCopySuccess(false), 2000); }} disabled={!results[activeTab as keyof typeof results]} className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold flex items-center gap-2 disabled:opacity-50">
@@ -293,7 +338,7 @@ export default function RepurposerPage() {
                     
                     {activeTab === 'linkedin' && (
                         <div className="flex items-center gap-2">
-                            {/* ACCOUNT SWITCHER - NOW WORKING */}
+                            {/* ACCOUNT SWITCHER */}
                             <div className="relative">
                                 <button onClick={() => setShowAuthorMenu(!showAuthorMenu)} className="px-3 py-2 bg-blue-900/20 text-blue-400 hover:bg-blue-900/30 rounded-lg text-xs font-bold flex items-center gap-2 border border-blue-500/30">
                                     {selectedAuthor ? <Building2 className="w-3 h-3" /> : <User className="w-3 h-3" />}
@@ -356,7 +401,7 @@ export default function RepurposerPage() {
                 </div>
             )}
 
-            {/* --- SCRIPT VAULT MODAL (NEW) --- */}
+            {/* --- SCRIPT VAULT MODAL --- */}
             {showScriptVault && (
                 <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
                     <div className="bg-[#0b1121] border border-white/10 rounded-2xl w-full h-full max-h-[500px] flex flex-col shadow-2xl">

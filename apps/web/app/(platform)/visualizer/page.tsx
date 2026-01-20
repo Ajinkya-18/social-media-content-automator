@@ -3,19 +3,45 @@ import { useCredits } from "../../components/CreditsContext";
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import AfterGlowToast from '../../components/AfterGlowToast';
-import { useRouter } from 'next/navigation'; // Added
+import { useRouter } from 'next/navigation';
 import { Eye, Loader2, Image as ImageIcon, Download, Sparkles, Wand2, Layers, Save, LayoutDashboard, Coins } from "lucide-react";
 
 export default function VisualizerPage() {
   const { refreshCredits } = useCredits();
-  const router = useRouter(); // Added
+  const router = useRouter();
   const { user } = useUser();
+  
+  // State
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [loading, setLoading] = useState(false);
+  
+  const [loading, setLoading] = useState(false); // Generation loading
+  const [isEnhancing, setIsEnhancing] = useState(false); // Prompt writing loading
+  const [isUploading, setIsUploading] = useState(false); // Drive upload loading
+  
   const [result, setResult] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccessLink, setUploadSuccessLink] = useState<string | null>(null);
+
+  // --- NEW: MAGIC PROMPT WRITER ---
+  const handleEnhance = async () => {
+      if (!prompt) return;
+      setIsEnhancing(true);
+      try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/enhance-prompt`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt: prompt })
+          });
+          const data = await res.json();
+          if (res.ok && data.enhanced_prompt) {
+              setPrompt(data.enhanced_prompt);
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsEnhancing(false);
+      }
+  };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +56,18 @@ export default function VisualizerPage() {
           body: JSON.stringify({ email: user.primaryEmailAddress.emailAddress, prompt: prompt, aspect_ratio: aspectRatio })
       });
       const data = await res.json();
-      if (res.ok && data.imageUrl) { setResult(data.imageUrl); await refreshCredits();} else { alert("Generation failed."); }
-    } catch (error) { console.error(error); alert("Error generating image."); } finally { setLoading(false); }
+      if (res.ok && data.imageUrl) { 
+          setResult(data.imageUrl); 
+          await refreshCredits();
+      } else { 
+          alert("Generation failed."); 
+      }
+    } catch (error) { 
+        console.error(error); 
+        alert("Error generating image."); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   const handleSaveToDrive = async () => {
@@ -56,10 +92,8 @@ export default function VisualizerPage() {
     } catch (e) { console.error(e); alert("Failed to save image."); setIsUploading(false); }
   };
 
-  // --- BRIDGE: SEND TO DASHBOARD ---
   const handleUseAsThumbnail = () => {
       if (!result) return;
-      // We pass the image URL to the dashboard via query param
       router.push(`/dashboard?action=set_thumbnail&image=${encodeURIComponent(result)}`);
   };
 
@@ -71,16 +105,40 @@ export default function VisualizerPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        
+        {/* LEFT: CONTROLS */}
         <div className="lg:col-span-1 bg-[#0b1121] p-6 rounded-3xl border border-white/5 flex flex-col shadow-2xl relative overflow-hidden h-full">
             <form onSubmit={handleGenerate} className="space-y-6 relative z-10 flex-1 flex flex-col">
                 <div className="flex justify-center items-center gap-1.5 text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-3">
                     <Coins className="w-3 h-3 text-cyan-400" /> 
                     Cost: <span className="text-cyan-400 font-bold">15 Credits</span> per image
                 </div>
-                <div className="flex-1">
-                    <label className="flex items-center gap-2 text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3"><Wand2 className="w-4 h-4" /> Vision Prompt</label>
-                    <textarea required value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="A cyberpunk city..." className="w-full h-40 bg-black/40 border border-white/10 rounded-2xl p-4 text-white focus:border-cyan-500 outline-none resize-none transition-all text-sm" />
+                
+                <div className="flex-1 flex flex-col">
+                    <div className="flex justify-between items-center mb-3">
+                        <label className="flex items-center gap-2 text-xs font-bold text-cyan-500 uppercase tracking-widest"><Wand2 className="w-4 h-4" /> Vision Prompt</label>
+                        
+                        {/* ENHANCE BUTTON */}
+                        <button 
+                            type="button" 
+                            onClick={handleEnhance} 
+                            disabled={isEnhancing || !prompt}
+                            className="text-[10px] flex items-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 px-2 py-1 rounded-lg border border-cyan-500/30 transition-all disabled:opacity-50"
+                        >
+                            {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
+                            {isEnhancing ? "Writing..." : "Enhance"}
+                        </button>
+                    </div>
+                    
+                    <textarea 
+                        required 
+                        value={prompt} 
+                        onChange={(e) => setPrompt(e.target.value)} 
+                        placeholder="A cyberpunk city..." 
+                        className="flex-1 w-full min-h-[160px] bg-black/40 border border-white/10 rounded-2xl p-4 text-white focus:border-cyan-500 outline-none resize-none transition-all text-sm leading-relaxed" 
+                    />
                 </div>
+
                 <div>
                     <label className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-widest mb-3"><Layers className="w-4 h-4" /> Dimensions</label>
                     <div className="grid grid-cols-3 gap-2">
@@ -89,12 +147,14 @@ export default function VisualizerPage() {
                         ))}
                     </div>
                 </div>
-                <button type="submit" disabled={loading || !prompt} className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 mt-auto">
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eye className="w-5 h-5" />} {loading ? "Synthesizing..." : "Generate Visual"}
+                
+                <button type="submit" disabled={loading || !prompt} className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 mt-auto group transition-all">
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eye className="w-5 h-5 group-hover:scale-110 transition-transform" />} {loading ? "Synthesizing..." : "Generate Visual"}
                 </button>
             </form>
         </div>
 
+        {/* RIGHT: PREVIEW */}
         <div className="lg:col-span-2 aspect-square lg:aspect-auto min-h-[500px] rounded-3xl bg-[#0b1121] border border-white/5 flex items-center justify-center relative overflow-hidden group/output shadow-2xl">
             {loading ? (
                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm z-20"><Loader2 className="w-20 h-20 text-cyan-400 animate-spin" /><p className="text-cyan-400 font-mono text-sm mt-8 animate-pulse tracking-widest uppercase">Rendering Pixels...</p></div>
@@ -107,7 +167,6 @@ export default function VisualizerPage() {
                          <button onClick={handleSaveToDrive} disabled={isUploading} className="px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all border bg-white/10 hover:bg-white/20 text-white backdrop-blur-md border-white/10">
                             {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save to Drive
                          </button>
-                         {/* BRIDGE BUTTON */}
                          <button onClick={handleUseAsThumbnail} className="px-6 py-3 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-xl font-bold flex items-center gap-2 transition-colors border border-cyan-500/40">
                             <LayoutDashboard className="w-4 h-4" /> Use as Thumbnail
                          </button>
