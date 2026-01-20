@@ -25,6 +25,7 @@ from auth import LINKEDIN_SCOPES
 from google import genai
 from google.genai import types
 import requests
+from typing import Optional
 
 
 load_dotenv()
@@ -678,4 +679,121 @@ async def process_credits(email: str, cost: int):
         .eq("user_email", email).execute()
 
     return profile['subscription_tier']
+
+@app.get("/api/vault/images")
+async def get_vault_images(email: str):
+    try:
+        res = supabase.table("assets").select("*")\
+            .eq("user_email", email)\
+            .eq("asset_type", "image")\
+            .order("created_at", desc=True).limit(20).execute()
+
+        return {"images": res.data}
+    
+    except Exception as e:
+        print(f"Vault Error: {e}")
+        return {"images": []}
+
+class LinkedInPostRequest(BaseModel):
+    linkedin_id: str
+    author_urn: str
+    text: str
+    image_url: Optional[str] = None
+
+@app.post("/api/linkedin/post")
+async def post_to_linkedin(payload: LinkedInPostRequest):
+    try:
+        res = supabase.table("social_tokens").select("acess_token")\
+            .eq("user_email", f"linkedin_{payload.linkedin_id}")\
+            .execute()
+
+        if not res.data:
+            raise HTPException(401, "LinkedIn not connected")
+
+        token = res.data[0]['access_token']
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0"
+        }
+
+        target_urn = payload.author_urn if payload.author_urn else f"urn:li:person:{payload.linkedin_id}"
+
+        media_asset_urn = None
+
+        if payload.image_url:
+            print(f"Uploading image to LinkedIn for {target_urn}...")
+
+            reg_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
+            reg_body = {
+                "registerUploadRequest": {
+                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                    "owner": target_urn,
+                    "serviceRelationships": [{
+                        "relationshipType": "OWNER",
+                        "identifier": "urn:li:userGeneratedContent"
+                    }]
+                }
+            }
+
+            reg_res = requests.post(reg_url, headers=headers, json=reg_body)
+
+            if reg_res.status_code != 200:
+                print(f"Register Error: {reg_res.text}")
+
+                raise HTTPException(400, f"Image Reg Failed: {reg_res.text}")
+
+            upload_data = reg_res.json()
+            upload_url = upload_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
+            media_asset_urn = upload_data['value']['asset']
+
+            img_content = requests.get(payload.image_url).content
+
+            upload_headers = {"Authorization": f"Bearer {token}"}
+            put_res = requests.put(upload_url, headers=upload_headers, data=img_content)
+
+            if put_res.status_code != 201:
+                print(f"Binary Upload Failed: {put_res.text}")
+
+        post_data = {
+            "author": target_urn,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {
+                        "text": payload.text
+                    },
+                    "shareMediaCategory": "IMAGE" if media_asset_urn else "NONE",
+                    "media": [{
+                        "status": "READY",
+                        "description": {"text": "Image from AfterGlow"},
+                        "media": media_asset_urn,
+                        "title": {"text": "Shared Media"}
+                    }] if media_asset_urn else []
+                }
+            },
+            "visibility": {
+                "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+            }
+        }
+
+        if not media_asset_urn:
+            del post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["media"]
+            post_data["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "NONE"
+
+        response = requests.post(
+            "https://api.linkedin.com/v2/ugcPosts",
+            headers=headers,
+            json=post_data
+        )
+
+        if response.status_code != 201:
+            raise HTTPException(400, f"LinkedIn Error: {response.text}")
+
+        return {"status": "success", "post_id": response.json().get("id")}
+
+    except Exception as e:
+        print(f"Posting Error: {e}")
+        raise HTTPException(500, str(e))
+
 
