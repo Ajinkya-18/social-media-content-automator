@@ -806,7 +806,7 @@ async def login_instagram():
         f"client_id={client_id}&"
         f"redirect_uri={redirect_uri}&"
         f"state={state}&"
-        f"scope={scope}"
+        f"scope={scope}&"
         f"response_type=code"
     )
     
