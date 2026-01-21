@@ -807,12 +807,19 @@ async def login_instagram():
         f"redirect_uri={redirect_uri}&"
         f"state={state}&"
         f"scope={scope}"
+        f"response_type=code"
     )
     
     return RedirectResponse(auth_url)
 
 @router.get("/auth/instagram/callback")
 async def callback_instagram(request: Request):
+    error = request.query_params.get("error")
+
+    if error:
+        print(f"Auth Error: {error}")
+        return RedirectResponse(f"{os.getenv('FRONTEND_URL')}/dashboard?error=instagram_auth_denied")
+    
     code = request.query_params.get("code")
 
     if not code:

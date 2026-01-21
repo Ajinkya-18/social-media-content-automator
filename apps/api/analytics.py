@@ -295,10 +295,11 @@ async def get_instagram_analytics(instagram_id: str):
             raise HTTPException(400, res["error"]["message"])
         
         return {
-            "username": res.get("username"),
-            "followers": res.get("followers_count"),
-            "posts": res.get("media_count"),
-            "profile_pic": res.get("profile_picture_url")
+            "username": res.get("username", "Unknown"),
+            "followers": res.get("followers_count", 0),
+            "posts": res.get("media_count", 0),
+            "profile_pic": res.get("profile_picture_url", ""),
+            "status": "active"
         }
     
     except Exception as e:
