@@ -277,3 +277,32 @@ async def get_analytics_intelligence(email: str):
             }
         }
 
+@router.get("/api/analytics/instagram")
+async def get_instagram_analytics(instagram_id: str):
+    try:
+        response = supabase.table("social_tokens").select("access_token").eq("user_email", f"instagram_{instagram_id}").execute()
+
+        if not response.data:
+            raise HTTPException(401, "Instagram not connected")
+        
+        access_token = response.data[0]['access_token']
+
+        url = f"https://graph.facebook.com/v18.0/{instagram_id}?fields=username,followers_count,media_count,profile_picture_url&access_token={access_token}"
+
+        res = requests.get(url).json()
+
+        if "error" in res: 
+            raise HTTPException(400, res["error"]["message"])
+        
+        return {
+            "username": res.get("username"),
+            "followers": res.get("followers_count"),
+            "posts": res.get("media_count"),
+            "profile_pic": res.get("profile_picture_url")
+        }
+    
+    except Exception as e:
+        print(f"IG Stats Error: {e}")
+        raise HTTPException(500, str(e))
+    
+

@@ -178,7 +178,8 @@ function DashboardContent() {
 
   const fetchInstaStats = async () => {
       try {
-          const res = await fetch(`${apiUrl}/instagram/stats?instagram_id=${instaId}`);
+          // UPDATE: Use the correct /api/analytics route
+          const res = await fetch(`${apiUrl}/api/analytics/instagram?instagram_id=${instaId}`);
           if (res.ok) setInstaStats(await res.json());
       } catch (e) { console.error("IG Fetch Error", e); }
   };

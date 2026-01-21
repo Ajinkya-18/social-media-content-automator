@@ -17,10 +17,8 @@ from googleapiclient.http import MediaIoBaseUpload
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import stripe
 import razorpay
 from supabase import Client, create_client
-
 
 
 os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
@@ -29,7 +27,6 @@ load_dotenv()
 
 router = APIRouter()
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 razorpay_client = razorpay.Client(auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET")))
 
@@ -802,7 +799,7 @@ async def login_instagram():
 
     state = secrets.token_urlsafe(16)
 
-    scope = "pages_show_list,instagram_manage_insights"
+    scope = "pages_show_list,instagram_manage_insights,instagram_basic,instagram_content_publish"
 
     auth_url = (
         f"https://www.facebook.com/v18.0/dialog/oauth?"
@@ -879,42 +876,6 @@ async def callback_instagram(request: Request):
 
     except Exception as e:
         print(f"Instagram Auth Error: {e}")
-        raise HTTPException(500, str(e))
-
-@router.get("/instagram/stats")
-async def get_instagram_stats(instagram_id: str):
-    try:
-        response = supabase.table("social_tokens")\
-            .select("access_token")\
-            .eq("user_email", f"instagram_{instagram_id}")\
-            .eq("provider", "instagram")\
-            .execute()
-
-        if not response.data:
-            raise HTTPException(401, "Instagram not connected")
-
-        access_token = response.data[0]['access_token']
-
-        url = (
-            f"https://graph.facebook.com/v18.0/{instagram_id}?"
-            f"fields=username,followers_count,media_count,profile_picture_url&"
-            f"access_token={access_token}"
-        )
-
-        stats_res = requests.get(url).json()
-
-        if "error" in stats_res:
-            raise HTTPException(400, stats_res["error"]["message"])
-
-        return {
-            "username": stats_res.get("username"),
-            "followers": stats_res.get("followers_count"),
-            "posts": stats_res.get("media_count"),
-            "profile_pic": stats_res.get("profile_picture_url")
-        }
-
-    except Exception as e:
-        print(f"IG Stats Error: {e}")
         raise HTTPException(500, str(e))
 
 class UpdateEventStatusRequest(BaseModel):
