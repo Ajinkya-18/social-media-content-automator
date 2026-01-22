@@ -799,7 +799,7 @@ async def login_instagram():
 
     state = secrets.token_urlsafe(16)
 
-    scope = "pages_show_list,pages_read_engagement,instagram_manage_insights,instagram_basic,instagram_content_publish"
+    scope = "pages_show_list,pages_read_engagement,instagram_manage_insights,instagram_basic,instagram_content_publish,business_management"
 
     auth_url = (
         f"https://www.facebook.com/v18.0/dialog/oauth?"
@@ -846,14 +846,17 @@ async def callback_instagram(request: Request):
         access_token = token_res["access_token"]
 
         pages_url = f"https://graph.facebook.com/v18.0/me/accounts?access_token={access_token}"
-        pages_res = requests.get(pages_url).json()
+        pages_res = requests.get(pages_url)
+        print(f"DEBUG Status: {pages_res.status_code}")
+        print(f"DEBUG Raw Body: {pages_res.text}")
+        data = pages_res.json()
         
         print(f"DEBUG: Found Pages: {pages_res}")
 
         ig_user_id = None
 
-        if "data" in pages_res:
-            for page in pages_res["data"]:
+        if "data" in data:
+            for page in data["data"]:
                 page_id = page["id"]
                 page_name = page["name"]
 
