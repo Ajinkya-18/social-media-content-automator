@@ -799,7 +799,7 @@ async def login_instagram():
 
     state = secrets.token_urlsafe(16)
 
-    scope = "pages_show_list,instagram_manage_insights,instagram_basic,instagram_content_publish"
+    scope = "pages_show_list,pages_read_engagement,instagram_manage_insights,instagram_basic,instagram_content_publish"
 
     auth_url = (
         f"https://www.facebook.com/v18.0/dialog/oauth?"
@@ -847,21 +847,29 @@ async def callback_instagram(request: Request):
 
         pages_url = f"https://graph.facebook.com/v18.0/me/accounts?access_token={access_token}"
         pages_res = requests.get(pages_url).json()
+        
+        print(f"DEBUG: Found Pages: {pages_res}")
 
         ig_user_id = None
 
         if "data" in pages_res:
             for page in pages_res["data"]:
                 page_id = page["id"]
+                page_name = page["name"]
+
                 ig_req = requests.get(
                     f"https://graph.facebook.com/v18.0/{page_id}?fields=instagram_business_account&access_token={access_token}"
                 ).json()
 
+                print(f"DEBUG: Checking Page '{page_name}' ({page_id}): {ig_req}")
+
                 if "instagram_business_account" in ig_req:
                     ig_user_id = ig_req["instagram_business_account"]["id"]
+                    print(f"SUCCESS: Found IG Account {ig_user_id} on Page {page_name}")
                     break
 
         if not ig_user_id:
+            print("ERROR: No Instagram Business Account found linked to any Page.")
             return RedirectResponse(
                 f"{os.getenv('FRONTEND_URL')}/dashboard?error=no_instagram_business_account"
             )
